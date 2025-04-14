@@ -1,5 +1,5 @@
 import ollama
-from abstractBaseClasses.LLMPrompter import LLMPrompter
+from AIprompting.LLMPrompter import LLMPrompter
 
 
 class OllamaPrompter(LLMPrompter):
