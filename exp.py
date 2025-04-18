@@ -1,6 +1,12 @@
 import subprocess
 import os
 
+import ollama
+from datasets import load_dataset
+
+from LLMPrompting.LLMPrompter import LLMPrompter
+from LLMPrompting.OllamaPrompters import OllamaPrompter
+from DataManagment.DBreading.datasetReaders import DatasetReader
 
 dir_path = "Haskell/"
 file_name = "main.hs"
@@ -13,3 +19,18 @@ running = subprocess.run([command], input="4\n5", text=True, capture_output=True
 
 print(running.stdout)
    
+
+dataset_name = "deepmind/code_contests"
+dataset = load_dataset(dataset_name)
+
+keys = ["description", "public_tests", "private_tests", "generated_tests"]
+
+reader = DatasetReader(dataset["train"])
+point = reader.getPoint(9500, keys)
+
+
+def printProblem(point, keys): 
+    for key in keys: 
+        print(point[key])
+
+printProblem(point, keys)

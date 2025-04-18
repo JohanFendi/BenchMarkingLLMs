@@ -1,4 +1,4 @@
-from DataManagment.DBReader import DBReader
+from DataManagment.DBreading.DBReader import DBReader
 from datasets import DatasetDict
 from typing import Dict, Any
 
