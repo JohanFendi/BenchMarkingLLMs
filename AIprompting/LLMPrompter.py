@@ -8,5 +8,5 @@ class LLMPrompter(ABC):
     """
 
     @abstractmethod
-    def prompt(description:str, coding_problem:str) -> str: 
+    def prompt(description:str, problem_description:str, public_tests:str) -> str: 
         pass
