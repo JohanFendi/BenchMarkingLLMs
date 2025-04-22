@@ -13,8 +13,8 @@ class DatasetReader(DBReader):
             raise IndexError(f"IndexError: Index {index} out of range for dataset with length {len(self._dataset)}.")
         
         point = self._dataset[index]
-        result = {key:point[key] for key in keys}
-        return result        
+        return {key:point[key] for key in keys}
+              
         
 
 
