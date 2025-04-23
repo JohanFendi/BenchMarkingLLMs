@@ -8,8 +8,8 @@ def formatPublicTests(input : list[str], output: list[str]) -> str:
         raise ValueError("Input and output must be same")
     
     strings = []
-    for i, (input_str, output) in enumerate(zip(input, output)): 
-        strings.append(f"Public test {i+1}:\nInput:\n{input_str}\nOutput:\n{output}")
+    for i, (input_str, output_str) in enumerate(zip(input, output)): 
+        strings.append(f"Public test {i+1}:\nInput:\n{input_str}\nOutput:\n{output_str}")
 
     return "\n".join(strings)
 
