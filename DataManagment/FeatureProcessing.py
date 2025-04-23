@@ -3,22 +3,20 @@ from typing import TypeVar, Dict
 T = TypeVar("T")
 
 
-def formatPublicTests(input : list[T], output: list[T]) -> str: 
-    raise NotImplementedError("formatPublicTests not implemented") 
+def formatPublicTests(input : list[str], output: list[str]) -> str: 
+    if len(input) != len(output): 
+        raise ValueError("Input and output must be same")
+    
+    strings = []
+    for i, (input_str, output) in enumerate(zip(input, output)): 
+        strings.append(f"Public test {i+1}:\nInput:\n{input_str}\nOutput:\n{output}")
+
+    return "\n".join(strings)
 
 
 def mergeFeatures(point:Dict[str, any], features:list[str], keys:list[str], newFeatureName:str) -> Dict[str, any]: 
-    """
-    Mutates the input point with the features in features merged into one feature. 
-    The point needs to be a dictionary type. The features of the point in turn also dictionaries. 
-    These dictionaries have the specified keys. Their values are lists of the same type. 
-    Ex: keys = ["input", "output"], features = ["private_tests", "generated_tests"], newFeatureName = "tests"
-    point = {"private_tests":{"input":[2], "output":[5]}, "generated_tests":{"input":[6], "output":[7]}}
-    Output is then: {"private_tests":{"input":[2, 6], "output":[5, 7]}
-    """
-
-    correct_typed_feature = {feature:{key:[] for key in keys } for feature in features}
-    if not compareTypes(correct_typed_feature, point): 
+    correctly_typed_feature = {feature:{key:[] for key in keys } for feature in features}
+    if not compareTypes(correctly_typed_feature, point): 
         raise TypeError("Type of point not equal to required type.")
 
     point[newFeatureName] = {key:[] for key in keys}

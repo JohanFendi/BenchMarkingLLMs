@@ -5,11 +5,12 @@ class FolderCreator(ABC):
     """
     Creates an folder with the name process_name, 
     in which it places an executable, along with other files. 
-    Returns the path to the executable. 
+    Returns the command to execute the executable. 
+    Should be called from main file. 
     """
 
     @abstractmethod
-    def create(solution:str, process_name:str) -> str: 
+    def create(solution:str, process_name:str, folder_name:str, file_name:str) -> str: 
         pass
 
     
