@@ -14,6 +14,8 @@ class Tester(SolutionTester):
             
             output = result.stdout.strip().strip('"')
             passed = passed and output == expected_outputs[i].strip()
+
+            if not passed: 
+                return f"FAILED,{i}"
         
-            
-        return "PASSED" if passed else "FAILED"
+        return "PASSED" 

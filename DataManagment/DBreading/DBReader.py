@@ -12,3 +12,7 @@ class DBReader(ABC):
         """
         
         pass
+
+    @abstractmethod
+    def getDBSize() -> int: 
+        pass
