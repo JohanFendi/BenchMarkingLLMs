@@ -2,7 +2,7 @@ from LLMPrompting.LLMPrompter import LLMPrompter
 from FolderCreation.FolderCreator import FolderCreator
 from DataManagment.DBreading.DBReader import DBReader
 from DataManagment.DBwriting.DBWriter import DBWriter
-from DataManagment.FeatureProcessing import mergeFeatures, formatPublicTests
+from DataManagment.Preprocessing.FeatureProcessing import mergeFeatures, formatPublicTests
 from SolutionTesting.SolutionTester import SolutionTester
 
 from typing import Dict, Any

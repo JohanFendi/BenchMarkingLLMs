@@ -3,19 +3,6 @@ from typing import TypeVar, Dict
 T = TypeVar("T")
 
 
-
-
-def formatPublicTests(input : list[str], output: list[str]) -> str: 
-    if len(input) != len(output): 
-        raise ValueError("Input and output must be same")
-    
-    strings = []
-    for i, (input_str, output_str) in enumerate(zip(input, output)): 
-        strings.append(f"Public test {i+1}:\nInput:\n{input_str}\nOutput:\n{output_str}")
-
-    return "\n".join(strings)
-
-
 def mergeFeatures(point:Dict[str, any], features:list[str], keys:list[str], newFeatureName:str) -> Dict[str, any]: 
     correctly_typed_feature = {feature:{key:[] for key in keys } for feature in features}
     if not compareTypes(correctly_typed_feature, point): 
