@@ -42,3 +42,7 @@ class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor):
             strings.append(f"Public test {i+1}:\nInput:\n{input_str}\nOutput:\n{output_str}")
 
         return "\n".join(strings)
+
+    @override
+    def getDBSize(self) -> int:
+        return self._dataset_reader.getDBSize()

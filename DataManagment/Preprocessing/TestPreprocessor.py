@@ -8,4 +8,6 @@ class TestPreprocessor(ABC):
         pass
 
     
-    
+    @abstractmethod
+    def getDBSize(self) -> int:
+        pass
