@@ -5,7 +5,7 @@ class DBReader(ABC):
 
     
     @abstractmethod
-    def getPoint(index:int,  keys : list[str]) -> Dict[str, Any]: 
+    def getPoint(self, index:int,  keys : list[str]) -> Dict[str, Any]: 
 
         """
         Retrieve specified key-value pairs from a data point at the given index.
@@ -14,5 +14,5 @@ class DBReader(ABC):
         pass
 
     @abstractmethod
-    def getDBSize() -> int: 
+    def getDBSize(self) -> int: 
         pass

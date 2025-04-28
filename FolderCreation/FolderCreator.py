@@ -10,7 +10,7 @@ class FolderCreator(ABC):
     """
 
     @abstractmethod
-    def create(solution:str, process_name:str, folder_name:str, file_name:str) -> str: 
+    def create(self, solution:str, process_name:str, folder_name:str, file_name:str) -> str: 
         pass
 
     
