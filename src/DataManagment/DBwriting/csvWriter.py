@@ -1,31 +1,40 @@
 import csv
 from typing import override
 
-from DataManagment.DBwriting.DBWriter import DBWriter
+from .DBWriter import DBWriter
 
 
 class CSVWriter(DBWriter): 
 
     def __init__(self, file_name:str, column_names:list[str], max_buffer_size:int) -> None:
+        if ".csv" in file_name and ".csv" == file_name[len(file_name)-4:]: 
+            file_name = file_name[:len(file_name)-4]
+        
         self._file_name = file_name
         self._column_names = column_names
         self._columns = {col:[] for col in self._column_names}
         self._max_buffer_size = max_buffer_size
         self._current_buffer_size = 0
+        self._setup_database()
+        
+  
 
+    @override
+    def _setup_database(self):
+        with open(f"{self._file_name}.csv", "a", newline="") as csv_file: 
+            writer = csv.writer(csv_file)
+            writer.writerow(self._column_names)
+        
 
     @override
     def _buffer(self, column_names:list[str], values:list[str]) -> None:
-
-        """Appends datapoint to buffer."""
-
         if len(column_names) != len(values): 
             raise ValueError("Number of column names not equal to number of values.")
 
         for (column, value) in zip(column_names, values): 
-            if column not in column_names: 
+            if column not in self._column_names: 
                 raise ValueError(f"Column {column} not a column of the DBWriter.")
-
+        
             self._columns[column].append(value)
 
         self._current_buffer_size += 1
@@ -33,10 +42,10 @@ class CSVWriter(DBWriter):
 
     @override
     def _flush(self) -> None:
-        with open(f"{self._file_name}.csv", "a") as csv_file: 
+        with open(f"{self._file_name}.csv", "a", newline="") as csv_file: 
             writer = csv.writer(csv_file)
             for i in range(self._current_buffer_size): 
-                writer.writerow([self._columns[col][i] for col in self._column_names]  )
+                writer.writerow([self._columns[col][i] for col in self._column_names])
 
         self._columns = {col:[] for col in self._column_names}
         self._current_buffer_size = 0
@@ -50,5 +59,5 @@ class CSVWriter(DBWriter):
 
 
     @override
-    def get_free_space(self):
+    def get_free_space(self) -> int:
         return self._max_buffer_size - self._current_buffer_size
