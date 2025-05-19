@@ -13,6 +13,7 @@ class PromptPreprocessor(ABC):
     def getProblemDescription(self, index:int) -> str: 
         pass
 
+
     @abstractmethod
     def getDBSize(self) -> int:
         pass

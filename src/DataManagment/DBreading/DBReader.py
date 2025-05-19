@@ -3,6 +3,7 @@ from typing import Dict, Any
 
 class DBReader(ABC): 
     
+
     @abstractmethod
     def getPoint(self, index:int,  keys : list[str]) -> Dict[str, Any]: 
 
@@ -11,6 +12,7 @@ class DBReader(ABC):
         """
         
         pass
+
 
     @abstractmethod
     def getDBSize(self) -> int: 

@@ -9,9 +9,10 @@ from .TestPreprocessor import TestPreprocessor
 
 class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor): 
 
+
     def __init__(self): 
-        self._dataset = load_dataset("deepmind/code_contests")
-        self._dataset_reader = DatasetReader(self._dataset)
+        dataset = load_dataset("deepmind/code_contests")
+        self._dataset_reader = DatasetReader(dataset)
 
 
     @override
@@ -41,6 +42,7 @@ class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor):
             strings.append(f"Public test {i+1}:\nInput:\n{input_str}\nOutput:\n{output_str}")
 
         return "\n".join(strings)
+
 
     @override
     def getDBSize(self) -> int:
