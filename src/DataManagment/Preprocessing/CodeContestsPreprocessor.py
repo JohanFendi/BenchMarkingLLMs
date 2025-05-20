@@ -1,7 +1,7 @@
 from datasets import load_dataset
 from typing import override
 
-from ..DBreading.datasetReaders import DatasetReader
+from ..DBreading.DatasetReader import DatasetReader
 from .FeatureProcessing import mergeFeatures
 from .PromptPreprocessor import PromptPreprocessor
 from .TestPreprocessor import TestPreprocessor
@@ -9,9 +9,8 @@ from .TestPreprocessor import TestPreprocessor
 
 class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor): 
 
-
     def __init__(self): 
-        dataset = load_dataset("deepmind/code_contests")
+        dataset = load_dataset("deepmind/code_contests")["train"]
         self._dataset_reader = DatasetReader(dataset)
 
 
@@ -20,8 +19,8 @@ class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor):
         point = self._dataset_reader.getPoint(index)
         features = ["private_tests", "public_tests", "generated_tests"]
         keys = ["input", "output"]
-        mergeFeatures(point, features, keys, "tests")
-        return (point["tests"]["input"],point["tests"]["output"])
+        new_point = mergeFeatures(point, features, keys, "tests")
+        return (new_point["tests"]["input"], new_point["tests"]["output"])
 
 
     @override

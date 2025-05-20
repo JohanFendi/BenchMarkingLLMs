@@ -1,10 +1,10 @@
-from datasets import DatasetDict
+from datasets import Dataset
 from typing import Dict, Any, override
 
 from .DBReader import DBReader
 
 class DatasetReader(DBReader):
-    def __init__(self, dataset : DatasetDict) -> None: 
+    def __init__(self, dataset : Dataset) -> None: 
         self._dataset = dataset
 
 
@@ -14,7 +14,7 @@ class DatasetReader(DBReader):
             raise IndexError(f"IndexError: Index {index} out of range for dataset with length {len(self._dataset)}.")
         
         point = self._dataset[index]
-        return {key:point[key] for key in keys}
+        return {key:point[key] for key in keys} #Returns requested key-value pairs.
     
     
     @override

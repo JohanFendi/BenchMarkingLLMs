@@ -13,7 +13,7 @@ class CSVWriter(DBWriter):
         
         self._path = f"{file_name}.csv"
         self._column_names = column_names
-        self._rows = [] # Tuple where _[i] is data of type _column_names[i]
+        self._rows = [] # Tuple where _rows[i] is data of type _column_names[i]
         self._max_buffer_size = max_buffer_size
         self._current_buffer_size = 0
         self._setup_database()
@@ -21,10 +21,11 @@ class CSVWriter(DBWriter):
         
     @override
     def _setup_database(self):
-
+    
         #If file exists and is non-empty, then we make sure 
         #its column names match the column names of the csvWriter
-        
+        #Throws a ValueError.
+ 
         if os.path.exists(self._path) and os.path.getsize(self._path) > 0: 
             column_names = None
 
@@ -60,8 +61,8 @@ class CSVWriter(DBWriter):
     def _flush(self) -> None:
         with open(self._path, "a", newline="") as csv_file: 
             writer = csv.writer(csv_file)
-            for i in range(self._current_buffer_size): 
-                writer.writerow(self._rows[i])
+            for row in self._rows: 
+                writer.writerow(row)
 
         self._rows = []
         self._current_buffer_size = 0
