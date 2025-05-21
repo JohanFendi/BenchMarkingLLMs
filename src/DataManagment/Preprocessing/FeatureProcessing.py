@@ -1,11 +1,10 @@
 from typing import TypeVar, Dict
-from copy import deepcopy
+
 
 T = TypeVar("T")
 
 
-def mergeFeatures(point:Dict[str, any], features:list[str], keys:list[str], newFeatureName:str) -> None: 
-    point = deepcopy(point)
+def buildMergedFeature(point:Dict[str, any], features:list[str], keys:list[str], newFeatureName:str) -> Dict[str, list[str]]: 
     correctly_typed_point = {feature:{key:[] for key in keys} for feature in features}
 
     if not compareTypes(correctly_typed_point, point): 
@@ -14,18 +13,15 @@ def mergeFeatures(point:Dict[str, any], features:list[str], keys:list[str], newF
     if newFeatureName in point:
         raise ValueError(f"Key '{newFeatureName}' already exists in the dictionary.")
 
-    point[newFeatureName] = {key:[] for key in keys}
+    merged_feature = {key:[] for key in keys}
 
     for key in keys:
-        resultingList = point[newFeatureName][key]
+        resultingList = merged_feature[key]
         for feature in features: 
             listOfFeatureToBeMerged = point[feature][key]
             resultingList.extend(listOfFeatureToBeMerged)
-
-    for feature in features: 
-        point.pop(feature)
-
-    return point
+            
+    return merged_feature
 
 
 def compareTypes(correctly_typed_dict:T, a:T) -> bool:
@@ -40,11 +36,8 @@ def compareTypes(correctly_typed_dict:T, a:T) -> bool:
         return False
     
     #Now we only have dictionaries
-    if not all([key in a.keys() for key in correctly_typed_dict.keys()]):
+    a_keys = a.keys()
+    if not all(key in a_keys for key in correctly_typed_dict.keys()):
         return False
-    
-    typeIsValid = True
-    for key in correctly_typed_dict.keys():
-        typeIsValid = typeIsValid and compareTypes(correctly_typed_dict[key], a[key])
 
-    return typeIsValid
+    return all(compareTypes(correctly_typed_dict[key], a[key]) for key in correctly_typed_dict.keys())

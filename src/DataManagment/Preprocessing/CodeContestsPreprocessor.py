@@ -2,25 +2,25 @@ from datasets import load_dataset
 from typing import override
 
 from ..DBreading.DatasetReader import DatasetReader
-from .FeatureProcessing import mergeFeatures
+from .FeatureProcessing import buildMergedFeature
 from .PromptPreprocessor import PromptPreprocessor
 from .TestPreprocessor import TestPreprocessor
 
 
 class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor): 
 
-    def __init__(self): 
-        dataset = load_dataset("deepmind/code_contests")["train"]
+    #dataset should be a slice of the following datastructure: load_dataset("deepmind/code_contests")["train"]
+    def __init__(self, dataset): 
         self._dataset_reader = DatasetReader(dataset)
 
 
     @override
-    def getTestCases(self, index:int) -> tuple[list[str], list[str]]:
-        point = self._dataset_reader.getPoint(index)
+    def getTestCases(self, index:int) -> dict[str, list[str]]:
         features = ["private_tests", "public_tests", "generated_tests"]
         keys = ["input", "output"]
-        new_point = mergeFeatures(point, features, keys, "tests")
-        return (new_point["tests"]["input"], new_point["tests"]["output"])
+        point = self._dataset_reader.getPoint(index, features)
+        tests_dict = buildMergedFeature(point, features, keys, "tests")
+        return tests_dict
 
 
     @override
@@ -31,7 +31,8 @@ class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor):
 
     @override
     def getFormatedPublicTests(self, index:int) -> str:
-        input, output = self.getTestCases(index)
+        point = self._dataset_reader.getPoint(index, ["public_tests"])
+        input, output = point["input"], point["output"]
 
         if len(input) != len(output): 
             raise ValueError("Length of Input and output not equal")
