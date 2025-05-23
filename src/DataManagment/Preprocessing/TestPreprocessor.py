@@ -5,7 +5,7 @@ class TestPreprocessor(ABC):
 
 
     @abstractmethod
-    def getTestCases(self, index:int) -> tuple[list[str], list[str]]: 
+    def getTestCases(self, index:int) -> dict[str, list[str]]: 
         pass
 
     

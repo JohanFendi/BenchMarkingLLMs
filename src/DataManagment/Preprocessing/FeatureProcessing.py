@@ -1,17 +1,14 @@
-from typing import TypeVar, Dict
+from typing import TypeVar
 
 
 T = TypeVar("T")
 
 
-def buildMergedFeature(point:Dict[str, any], features:list[str], keys:list[str], newFeatureName:str) -> Dict[str, list[str]]: 
+def buildMergedFeature(point:dict[str, any], features:list[str], keys:list[str]) -> dict[str, list[str]]: 
     correctly_typed_point = {feature:{key:[] for key in keys} for feature in features}
 
     if not compareTypes(correctly_typed_point, point): 
         raise TypeError("Type of point not equal to required type.")
-    
-    if newFeatureName in point:
-        raise ValueError(f"Key '{newFeatureName}' already exists in the dictionary.")
 
     merged_feature = {key:[] for key in keys}
 
