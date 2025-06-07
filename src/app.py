@@ -3,7 +3,7 @@ from os import getpid
 
 
 from LLMPrompting.LLMPrompter import LLMPrompter
-from FolderCreation.FolderCreator import FolderCreator
+from Compilation.FolderCreator import FolderCreator
 from DataManagment.DBreading.DBReader import DBReader
 from DataManagment.DBwriting.DBWriter import DBWriter
 from DataManagment.Preprocessing.PromptPreprocessor import PromptPreprocessor
