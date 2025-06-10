@@ -9,7 +9,7 @@ class ProcessFolderCreator(FolderCreator):
     #Creates a folder for each process id inside a parent folder named folder_name
     #Meant to be used only once to set up folders. 
     @override 
-    def setUpFolders(self, folder_name:str, process_ids:list[str]) -> None: 
+    def init_folders(self, folder_name:str, process_ids:list[str]) -> None: 
         if not Path(folder_name).exists(): 
             Path(folder_name).mkdir()
 

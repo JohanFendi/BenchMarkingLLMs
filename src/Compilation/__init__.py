@@ -1,4 +1,4 @@
 from .FolderCreator import FolderCreator
-from .HSFolderCreator import HSFolderCreator
+from .ProcessFolderCreator import HSFolderCreator
 
-__all__ = ["FolderCreator", "HSFolderCreator"]
+__all__ = ["FolderCreator", "ProcessFolderCreator"]

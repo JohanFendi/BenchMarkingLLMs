@@ -5,19 +5,19 @@ from typing import override
 
 class Tester(SolutionTester):
 
-    @override
-    def runTestCases(self, command:str, input_strings:list[str], output_strings:list[str]) -> str: 
-        passed = True
-        for i, input_str in enumerate(input_strings):
-            result = run([command], input=input_str, capture_output=True, text=True)
+    @override                                                                                #(Status, returncode, index)
+    def run_test_cases(self, command:str, input_strings:list[str], output_strings:list[str]) -> tuple[str, int, str]: 
+        
+        for i, (test_input, expected_output) in enumerate(zip(input_strings, output_strings)):
+            result = run([command], input=test_input, capture_output=True, text=True)
 
-            if not result.stderr == "": 
-                return "ERROR"
+            if result.returncode != 0: 
+                return ("ERROR", result.returncode, i)
             
             output = result.stdout.strip().strip('"')
-            passed = passed and output == output_strings[i].strip()
-
-            if not passed: 
-                return f"FAILED,{i}"
+            expected_output = expected_output.strip()
+            
+            if output == expected_output: 
+                return ("FAILED", result.returncode, i)
         
-        return "PASSED" 
+        return ("PASSED", 0, -1)  
