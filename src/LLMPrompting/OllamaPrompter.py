@@ -1,17 +1,20 @@
-import ollama
+from ollama import chat
 from LLMPrompting.LLMPrompter import LLMPrompter 
 
 
 class OllamaPrompter(LLMPrompter):
 
-    def __init__(self, client:ollama.Client, model:str) -> None:
-        self._client = client
+    def __init__(self, model:str) -> None:
         self._model = model
 
 
     def prompt(self, task_description:str, problem_description:str, formated_public_tests:str) -> str: 
-        prompt = f"""Task description: {task_description} \n 
-                    Coding problem: {problem_description} \n 
-                    Formated Public Tests: {formated_public_tests}"""
-        response = self._client.generate(model=self._model, prompt = prompt)
-        return response.response
+        log = [
+                {"role":"system", "content": "You are a Haskell Expert"}, 
+                {"role": "user", "content": f"Task description: {task_description}"},
+                {"role": "user", "content": f"Problem description: {problem_description}"}, 
+                {"role": "user", "content": f"Formated Public Tests: {formated_public_tests}"}
+              ]
+        
+        response = chat(self._model, messages=log)
+        return response.message.content

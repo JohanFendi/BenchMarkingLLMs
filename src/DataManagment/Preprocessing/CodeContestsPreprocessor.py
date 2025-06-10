@@ -40,13 +40,13 @@ class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor):
         self._checkIndexValid(index)
         self._cache_Point(index)
         public_tests = self._cached_point["public_tests"]
-        test_input, test_output = public_tests["input"], public_tests["output"]
+        test_inputs, expected_outputs = public_tests["input"], public_tests["output"]
 
-        if len(test_input) != len(test_output): 
-            raise ValueError(f"Mismatched lengths: input has {len(input)}, output has {len(test_output)}.")
+        if len(test_inputs) != len(expected_outputs): 
+            raise ValueError(f"Mismatched lengths: input has {len(input)}, output has {len(expected_outputs)}.")
         
         strings = []
-        for i, (input_str, output_str) in enumerate(zip(input, test_output)): 
+        for i, (input_str, output_str) in enumerate(zip(test_inputs, expected_outputs)): 
             strings.append(f"Public test {i+1}:\nInput:\n{input_str}\nOutput:\n{output_str}")
 
         return "\n".join(strings)
