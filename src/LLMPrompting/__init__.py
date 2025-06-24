@@ -1,4 +1,4 @@
 from .LLMPrompter import LLMPrompter
-from .OllamaPrompters import OllamaPrompter
+from .OllamaPrompter import OllamaPrompter
 
 __all__ = ["LLMPrompter", "OllamaPrompter"]

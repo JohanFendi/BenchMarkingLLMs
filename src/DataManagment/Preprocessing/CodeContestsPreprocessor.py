@@ -9,8 +9,8 @@ from .TestPreprocessor import TestPreprocessor
 
 class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor): 
 
-    #dataset should be a slice of the following datastructure: load_dataset("deepmind/code_contests")["train"], 
-    #and thus with type Dataset. 
+    #dataset should be a slice of the following datastructure: 
+    #load_dataset("deepmind/code_contests")["train"] and thus of type Dataset. 
     def __init__(self, dataset:Dataset): 
         self._dataset_reader = DatasetReader(dataset)
         self._features = ["private_tests", "public_tests", "generated_tests", "description"]
@@ -43,7 +43,7 @@ class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor):
         test_inputs, expected_outputs = public_tests["input"], public_tests["output"]
 
         if len(test_inputs) != len(expected_outputs): 
-            raise ValueError(f"Mismatched lengths: input has {len(input)}, output has {len(expected_outputs)}.")
+            raise ValueError(f"Mismatched lengths: test input has {len(test_inputs)}, test output has {len(expected_outputs)}.")
         
         strings = []
         for i, (input_str, output_str) in enumerate(zip(test_inputs, expected_outputs)): 

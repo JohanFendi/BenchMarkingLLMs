@@ -3,7 +3,7 @@ from pathlib import Path
 from subprocess import run
 from sys import platform
 
-from ..Compilation.Compiler import Compiler
+from .Compiler import Compiler
 
 
 class WindowsGhcCompiler(Compiler): 
@@ -16,8 +16,8 @@ class WindowsGhcCompiler(Compiler):
         """ 
        
         #Check flie exists
-        file_path = f"{folder_name}/{process_id}/{file_name}.hs"
-        if not Path(file_path).exists(): 
+        file_path = f"{folder_name}/{process_id}/{file_name}"
+        if not Path(f"{file_path}.hs").exists(): 
             raise FileNotFoundError(f"File {file_path} not found.")
         
         #Check OS is Windows

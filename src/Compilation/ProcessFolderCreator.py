@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import override
 
-from Compilation.FolderCreator import FolderCreator
+from src.Compilation.FolderCreator import FolderCreator
 
 
 class ProcessFolderCreator(FolderCreator): 

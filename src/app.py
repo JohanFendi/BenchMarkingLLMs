@@ -52,7 +52,8 @@ class App:
             command = self._compiler.compile(process_id, folder_name, file_name)         
 
             #Run tests
-            testcase_inputs, testcase_outputs = self._test_preprocessor.getTestCases(i)
+            tests = self._test_preprocessor.getTestCases(i)
+            testcase_inputs, testcase_outputs = tests["output"], tests["input"]
             (status, returncode, testcase_index) = self._solution_tester.run_test_cases(command, testcase_inputs, testcase_outputs)
 
             #Store results
