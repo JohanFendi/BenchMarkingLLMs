@@ -11,96 +11,92 @@ from src.Compilation.WindowsGhcCompiler import WindowsGhcCompiler
 from src.SolutionWriting.RegularSolutionWriter import RegularSolutionWriter
 from src.SolutionTesting.Tester import Tester
 from src.DataManagment.DBwriting.csvWriter import CSVWriter
-from constants import TASK_DESCRIPTION
-
+from src.LLMPrompting.GPTPrompter import GPTPrompter
+import constants 
 
 
 dataset = load_dataset("deepmind/code_contests")["train"]
+model = "o4-mini-2025-04-16"
+pid = getpid()
+file_name = "main"
+csv_file_name  = "test"
+folder_name = "haskell"
+column_names = ["status", "problem_solution", "failed_testcase_index", "failed_output", "stderr", "return_code"]
 
+preprocessor = CodeContestsPreprocessor(dataset)
+llm_prompter = GPTPrompter(model)
+compiler = WindowsGhcCompiler()
+solution_writer = RegularSolutionWriter()
+db_writer = CSVWriter(csv_file_name, column_names, 10)
+tester = Tester()
+folder_creator = ProcessFolderCreator()
+folder_creator.init_folders(folder_name, [pid])
+
+verbose = True
+
+#Tests total pipeline health 
 def test_case_zero_with_mock_solution():     
     index = 0
-    pid = getpid()
-    file_name = "main"
-    csv_file_name  = "test"
-    folder_name = "haskell"
-    column_names = ["status", "returncode", "testcase_index"]
-
-    mock_solution = r"""
-main :: IO ()
-main = interact $ \input ->
-  let (_:ss) = lines input
-  in unlines $ map (\s -> if balanced s then "YES" else "NO") ss
-
-balanced :: String -> Bool
-balanced = go 0
-  where
-    go 0 []     = True
-    go _ []     = False
-    go n (x:xs)
-      | n < 0         = False
-      | x == '('      = go (n + 1) xs
-      | x == ')'      = go (n - 1) xs
-      | otherwise     = go n xs
-
-    """
-
-    preprocessor = CodeContestsPreprocessor(dataset)
-    folder_creator = ProcessFolderCreator()
-    compiler = WindowsGhcCompiler()
-    solution_writer = RegularSolutionWriter()
-    db_writer = CSVWriter(csv_file_name, column_names, 10)
-    tester = Tester()
+    mock_solution = constants.PROBLEM_ONE_SOLUTION
    
-
     folder_creator.init_folders(folder_name, [pid])
     solution_writer.write_solution(file_name, folder_name, pid, mock_solution, ".hs")
-    command = compiler.compile(pid, folder_name, file_name)
+    command, return_code, stderr = compiler.compile(pid, folder_name, file_name)
 
-    tests = preprocessor.getTestCases(index)
-    testcase_inputs, testcase_outputs = tests["output"], tests["input"]
-    (status, result, testcase_index) = tester.run_test_cases(command, testcase_inputs, testcase_outputs)
-    return_code = result.returncode
-    db_writer.write(column_names, [status, return_code, testcase_index])
-
-    assert status == "PASSED", f"Status {status} does not match PASSED"
     assert return_code == 0, f"Returncode should be 0, not {return_code}"
 
+    tests = preprocessor.getTestCases(index)
+    testcase_inputs, testcase_outputs = tests["input"], tests["output"]
+    status, result, testcase_index, failed_output= tester.run_test_cases(command, testcase_inputs, testcase_outputs)
 
+    db_writer.write(column_names, [status, mock_solution, testcase_index, failed_output, result.stderr, result.returncode])
+    db_writer.flush()
 
-def test_first_ten_with_Ollama(): 
+    assert status == "PASSED", f"Status {status} does not match PASSED"
+    assert result.returncode == 0, f"Returncode should be 0, not {result.returncode}"
     
+
+
+def test_first_ten_with_OpenAI(): 
+    test_results = []
+
     for i in range(10): 
-      model = "llama3.2-vision:latest"
-      pid = getpid()
-      file_name = "main"
-      csv_file_name  = "test"
-      folder_name = "haskell"
-      column_names = ["status", "returncode", "testcase_index"]
-
-
-      preprocessor = CodeContestsPreprocessor(dataset)
-      llm_prompter = OllamaPrompter(model)
-      folder_creator = ProcessFolderCreator()
-      compiler = WindowsGhcCompiler()
-      solution_writer = RegularSolutionWriter()
-      db_writer = CSVWriter(csv_file_name, column_names, 10)
-      tester = Tester()
-  
-      
       formated_public_tests = preprocessor.getFormatedPublicTests(i)
       problem_description = preprocessor.getProblemDescription(i)
-      solution = llm_prompter.prompt(TASK_DESCRIPTION, problem_description, formated_public_tests)
-
-      folder_creator.init_folders(folder_name, [pid])
+      solution = llm_prompter.prompt(constants.SYSTEM_PROMPT, constants.TASK_DESCRIPTION, problem_description, formated_public_tests)
       solution_writer.write_solution(file_name, folder_name, pid, solution, ".hs")
-      command = compiler.compile(pid, folder_name, file_name)
+      command, return_code, stderr = compiler.compile(pid, folder_name, file_name)
 
-      tests = preprocessor.getTestCases(i)
-      testcase_inputs, testcase_outputs = tests["output"], tests["input"]
-      (status, result, testcase_index) = tester.run_test_cases(command, testcase_inputs, testcase_outputs)
-      return_code = result.returncode
-      db_writer.write(column_names, [status, return_code, testcase_index])
-      db_writer._flush()
+      if verbose: 
+        print(f"\n===Test Case {i}===")
+ 
+      if return_code == 0: 
+        tests = preprocessor.getTestCases(i)
+        testcase_inputs, testcase_outputs = tests["input"], tests["output"]
+        status, result, testcase_index, failed_output = tester.run_test_cases(command, testcase_inputs, testcase_outputs)
 
-      assert status == "PASSED", f"Status {status} does not match PASSED"
-      assert return_code == 0, f"Returncode should be 0, not {return_code}"
+        return_code = result.returncode
+        stderr = result.stderr
+        db_writer.write(column_names, [status, solution, testcase_index, failed_output, stderr, return_code])
+        test_results.append(status)
+
+      else: 
+        status = constants.COMPILATION_ERROR_STRING
+        db_writer.write(column_names, [status, solution, -1, "" , stderr, return_code])
+        test_results.append(status)
+         
+      if verbose: 
+        print(f"\nStatus:{status}")
+        print(f"\nError:{stderr}")
+        print(f"\nSolution:{solution}")
+        print(f"\nReturn code:{return_code}")
+      
+      
+    if verbose: 
+      print(test_results)
+
+    db_writer.flush()
+    assert all(res == "PASSED" for res in test_results), f"Status does not match PASSED"
+
+    
+

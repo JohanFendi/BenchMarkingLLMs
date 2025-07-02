@@ -77,7 +77,6 @@ def test_buffer_is_size_correct_when_not_above_limit():
 def test_error_when_appending_incomplete_datapoint(): 
     writer =  DBWriter(FILE_PATH, COLS , 15)
 
-
     with pytest.raises(ValueError) as exeptionInfo: 
         writer.write(COLS, ["Print(Hello)"])
 
@@ -86,7 +85,6 @@ def test_error_when_appending_incomplete_datapoint():
 
 def test_error_when_appending_faulty_columns(): 
     writer = DBWriter(FILE_PATH, COLS , 15)
-
 
     with pytest.raises(ValueError) as exeptionInfo: 
         writer.write(["Solution", "Weather", "Rating"], ["Print(Hello)", "Failed", "655"])

@@ -8,9 +8,10 @@ from .Compiler import Compiler
 
 class WindowsGhcCompiler(Compiler): 
 
+    HIDDEN_PACKAGES = ["array", "containers"]
 
     @override
-    def compile(self, process_id:str, folder_name:str, file_name:str) -> str: 
+    def compile(self, process_id:str, folder_name:str, file_name:str) -> tuple[str, int, str]: 
         """
         Compiles file and returns executable command.
         """ 
@@ -25,12 +26,22 @@ class WindowsGhcCompiler(Compiler):
             raise NotImplementedError(f"WindowsGhcCompiler does not support following OS:{platform}")
 
         #Compile file, this part varies a lot from os to os
-        
-        command = ["ghc", file_path]
+        command = self._get_command(file_path)
         result = run(command, capture_output=True, text=True)
-        
-        #Raise error 
-        if result.returncode != 0: 
-            raise RuntimeError(f"ghc compile failed:\n{result.stderr}")
 
-        return f"{file_path}.exe" # .exe is windows specific
+        return (f"{file_path}.exe", result.returncode, result.stderr) # .exe is windows specific
+
+
+    def _get_command(self, file_path:str) -> list[str]: 
+        command = ["ghc"]
+
+        #Expose hidden packages
+        for pkg in WindowsGhcCompiler.HIDDEN_PACKAGES: 
+            command.append("-package")
+            command.append(pkg)
+
+        command.append(file_path)
+
+        return command
+
+        

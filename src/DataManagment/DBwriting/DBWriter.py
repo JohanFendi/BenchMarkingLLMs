@@ -7,7 +7,7 @@ class DBWriter(ABC):
         self._buffer(column_names, values)
 
         if self._isBufferFull(): 
-            self._flush()
+            self.flush()
 
     @abstractmethod
     def _setup_database(self) -> None: 
@@ -27,7 +27,7 @@ class DBWriter(ABC):
 
 
     @abstractmethod
-    def _flush(self) -> None: 
+    def flush(self) -> None: 
         """Writes all points in the buffer to the database. Should reset 
             the value of the number of points in the buffer to zero and 
             clear the buffer"""
@@ -35,4 +35,9 @@ class DBWriter(ABC):
 
     @abstractmethod
     def get_free_space(self) -> int: 
+        pass
+
+    @abstractmethod
+    def get_column_names(self) -> list[str]: 
+        """Return copy of column names."""
         pass

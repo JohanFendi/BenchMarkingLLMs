@@ -19,6 +19,7 @@ class AkashPrompter(LLMPrompter):
             api_key=key, 
             base_url= "https://chatapi.akash.network/api/v1"
         )
+        print(self._client.models.list())
         
     @override
     def prompt(self, system_prompt:str, task_description:str, problem_description:str, public_tests:str) -> str: 
