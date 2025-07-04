@@ -23,7 +23,7 @@ class WindowsGhcCompiler(Compiler):
         
         #Check OS is Windows
         if not platform.startswith("win"): 
-            raise NotImplementedError(f"WindowsGhcCompiler does not support following OS:{platform}")
+            raise OSError(f"WindowsGhcCompiler does not support following OS:{platform}")
 
         #Compile file, this part varies a lot from os to os
         command = self._get_command(file_path)

@@ -43,8 +43,8 @@ class CSVWriter(DBWriter):
 
             elif column_names != self._column_names: 
                 raise ValueError(
-                f"CSV schema mismatch: expected columns {self._column_names} "
-                f"but found {column_names}, len file is {os.path.getsize(self._path)}" )
+                f"""CSV schema mismatch: expected columns {self._column_names}
+                    but found {column_names}, len file is {os.path.getsize(self._path)}""" )
             
         else: 
             with open(self._path, "w", newline="") as csv_file: 

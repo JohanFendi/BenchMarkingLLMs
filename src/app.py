@@ -1,5 +1,6 @@
 from typing import Dict, Any
 from os import getpid
+from time import time
 
 from LLMPrompting.LLMPrompter import LLMPrompter
 from Compilation.FolderCreator import FolderCreator
@@ -14,6 +15,7 @@ from constants import COMPILATION_ERROR_STRING, NO_FAILED_TESTCASES_INDEX, NO_FA
 
 
 class App: 
+
     def __init__(self, test_preprocessor:TestPreprocessor, prompt_preprocessor:PromptPreprocessor,
                  llm_prompter:LLMPrompter, folder_creator:FolderCreator, compiler:Compiler, 
                  solution_writer:SolutionWriter, db_writer:DBWriter, 
@@ -24,6 +26,11 @@ class App:
             
         if end_index >= prompt_preprocessor.getDBSize() or end_index >= test_preprocessor.getDBSize(): 
             raise IndexError(f"end_index greater than or equal to database size.")
+        
+        for col in db_writer.get_column_names(): 
+            if col not in AVAILABLE_COLUMNS: 
+                raise ValueError(f"Column {col} not available.")
+
             
         self._prompt_preprocessor = prompt_preprocessor
         self._test_preprocessor = test_preprocessor
@@ -37,47 +44,86 @@ class App:
         self._solution_tester = solution_tester
 
 
-    #Relative order of column names should be: status, problem_solution, failed_testcase_index, failed_output, stderr, return_code. 
     def run(self, llm_task_description:str, 
             folder_name:str, file_name:str, 
-            file_postfix:str, column_names:list[str]) -> None:
+            file_postfix:str, epoch_size:int) -> None:
         
-        valid, error_msg = self.valid_columns(column_names)
-        if not valid: 
-            raise RuntimeError(error_msg)        
-        
+        column_names = self._db_writer.get_column_names()
         process_id = str(getpid())
         self._folder_creator.init_folders(folder_name,[process_id])
-   
+
         for i in range(self._start_index, self._end_index): 
-        
+
             #Get data for prompt
-            problem_description = self._prompt_preprocessor.getProblemDescription(i)
-            formated_public_tests = self._prompt_preprocessor.getFormatedPublicTests(i)
+            try: 
+              status, problem_solution, failed_testcase_index, failed_output, stderr, return_code = self.run_iteration(i, llm_task_description, 
+                                                                                            file_name, folder_name, process_id, file_postfix)
+            except ValueError as e: 
+                print("Failed") #TODO Logging
+                continue
 
-            #Get Ai-generated solution, write it to file and compile.
-            problem_solution = self._llm_prompter.prompt(llm_task_description, problem_description, formated_public_tests)
-            self._solution_writer.write_solution(file_name, folder_name, process_id, problem_solution, file_postfix)
-            command, return_code, stderr = self._compiler.compile(process_id, folder_name, file_name)
+            ################# REED FLAAGG
+            except FileNotFoundError as e: 
+                print("Failed") #TODO logging
+                return #File does not exist, so all other cases will also fail
             
-            failed_output = "" # actual output of failed test case
-            failed_testcase_index = NO_FAILED_TESTCASES_INDEX 
-            status = NO_FAILED_TESTCASES_OUTPUT #ERROR, PASSED, FAILED or COMPILATION_ERROR
-
-            #Run tests
-            if return_code == 0:                 
-                tests = self._test_preprocessor.getTestCases(i)
-                testcase_inputs, testcase_outputs = tests["input"], tests["output"]
-                status, result, failed_testcase_index, failed_output = self._solution_tester.run_test_cases(command, testcase_inputs, testcase_outputs)
-                return_code = result.returncode
-                stderr = result.stderr
+            except FileNotFoundError as e: 
+                print("Failed") #TODO logging
+                return #File does not exist, so all other cases will also fail
             
-            #The compilation resulted in an error
-            else: 
-                status = COMPILATION_ERROR_STRING
+            ###################################
+            
+            except OSError as e: 
+                print("Failed") #TODO logging
+                return #Wrong OS
+            
+            except TypeError as e: 
+                print("Wrong structure of datapoint") #TODO logging
+    
+            try: 
+                self.store_result(status, problem_solution, failed_testcase_index, failed_output, stderr, return_code, column_names)
+            except ValueError as e: 
+                print("Failed") #TODO logging
+                return #Because columns are bad
+        
+        self._db_writer.flush()
+        
+  
+        
+    def run_iteration(self, index:int, llm_task_description:str,
+                    file_name:str, folder_name:str, 
+                    process_id:int, file_postfix:str): 
+        
+        formated_public_tests = self._prompt_preprocessor.getFormatedPublicTests(index)
+        problem_description = self._prompt_preprocessor.getProblemDescription(index)
 
-            #Store results
-            col_map = {
+        problem_solution = self._llm_prompter.prompt(llm_task_description, problem_description, formated_public_tests)
+        self._solution_writer.write_solution(file_name, folder_name, process_id, problem_solution, file_postfix)
+        command, return_code, stderr = self._compiler.compile(process_id, folder_name, file_name)
+
+        failed_output = NO_FAILED_TESTCASES_OUTPUT # actual output of failed test case
+        failed_testcase_index = NO_FAILED_TESTCASES_INDEX 
+        status = "" #ERROR, PASSED, FAILED or COMPILATION_ERROR
+
+        if return_code == 0:       
+            tests = self._test_preprocessor.getTestCases(i)
+            testcase_inputs, testcase_outputs = tests["input"], tests["output"]
+            status, result, failed_testcase_index, failed_output = self._solution_tester.run_test_cases(command, testcase_inputs, testcase_outputs)
+            return_code = result.returncode
+            stderr = result.stderr
+
+        #The compilation resulted in an error
+        else: 
+            status = COMPILATION_ERROR_STRING
+
+        return status, problem_solution, failed_testcase_index, failed_output, stderr, return_code
+    
+
+    def store_result(self, status:str, problem_solution:str, 
+                     failed_testcase_index:int, failed_output:str, 
+                     stderr:str, return_code:int, column_names:str) -> None: 
+        
+        col_map = {
                 "status":                    status,
                 "problem_solution":          problem_solution,
                 "failed_testcase_index":     failed_testcase_index,
@@ -85,20 +131,7 @@ class App:
                 "stderr":                    stderr,
                 "return_code":               return_code
             }
-            row = [col_map[col] for col in column_names]
-            self._db_writer.write(column_names, row)
-
-        self._db_writer.flush()
-
-  
-    #Valid or not and eventuall error msg. 
-    def valid_columns(self, column_names:list[str])->tuple[bool, str]: 
-        if column_names != self._db_writer.get_column_names(): 
-            return (False, f"column_names not equal to column names of data base writer.")
         
-        for col in column_names: 
-            if col not in AVAILABLE_COLUMNS: 
-                return (False, f"Feature {col} cannot be stored. Available features are: {AVAILABLE_COLUMNS}")
-            
-        return (True, "")
-            
+        row = [col_map[col] for col in column_names]
+        self._db_writer.write(column_names, row)
+
