@@ -12,6 +12,7 @@ from SolutionTesting.SolutionTester import SolutionTester
 from Compilation.Compiler import Compiler
 from SolutionWriting.SolutionWriter import SolutionWriter
 from constants import COMPILATION_ERROR_STRING, NO_FAILED_TESTCASES_INDEX, NO_FAILED_TESTCASES_OUTPUT, AVAILABLE_COLUMNS
+from exceptions import *
 
 
 class App: 
@@ -54,37 +55,41 @@ class App:
 
         for i in range(self._start_index, self._end_index): 
 
-            #Get data for prompt
+            #Get solution, compile and test it. 
             try: 
               status, problem_solution, failed_testcase_index, failed_output, stderr, return_code = self.run_iteration(i, llm_task_description, 
                                                                                             file_name, folder_name, process_id, file_postfix)
-            except ValueError as e: 
+            except DataLengthMismatchError as e: 
                 print("Failed") #TODO Logging
                 continue
 
-            ################# REED FLAAGG
+            except DirectoryNotFoundError as e: 
+                print("Failed") #TODO logging
+                return 
+            
             except FileNotFoundError as e: 
                 print("Failed") #TODO logging
-                return #File does not exist, so all other cases will also fail
+                return 
             
-            except FileNotFoundError as e: 
+            except WrongOSError as e: 
                 print("Failed") #TODO logging
-                return #File does not exist, so all other cases will also fail
+                return
             
-            ###################################
-            
-            except OSError as e: 
-                print("Failed") #TODO logging
-                return #Wrong OS
-            
-            except TypeError as e: 
+            except NestedTypeMismatchError as e: 
                 print("Wrong structure of datapoint") #TODO logging
-    
+                return
+
+            #Store result. 
             try: 
                 self.store_result(status, problem_solution, failed_testcase_index, failed_output, stderr, return_code, column_names)
-            except ValueError as e: 
-                print("Failed") #TODO logging
-                return #Because columns are bad
+
+            except DataLengthMismatchError as e: 
+                print("Knas")
+                continue
+
+            except ColumnMismatchError as e: 
+                print("Failed")
+                return
         
         self._db_writer.flush()
         
@@ -92,7 +97,7 @@ class App:
         
     def run_iteration(self, index:int, llm_task_description:str,
                     file_name:str, folder_name:str, 
-                    process_id:int, file_postfix:str): 
+                    process_id:int, file_postfix:str) -> None: 
         
         formated_public_tests = self._prompt_preprocessor.getFormatedPublicTests(index)
         problem_description = self._prompt_preprocessor.getProblemDescription(index)

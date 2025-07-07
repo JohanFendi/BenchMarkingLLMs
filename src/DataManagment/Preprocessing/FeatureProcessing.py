@@ -1,5 +1,7 @@
 from typing import TypeVar
 
+from exceptions import NestedTypeMismatchError
+
 
 T = TypeVar("T")
 
@@ -8,7 +10,7 @@ def buildMergedFeature(point:dict[str, any], features:list[str], keys:list[str])
     correctly_typed_point = {feature:{key:[] for key in keys} for feature in features}
 
     if not compareTypes(correctly_typed_point, point): 
-        raise TypeError("Type of point not equal to required type.")
+        raise NestedTypeMismatchError("Type of point not equal to required type.")
 
     merged_feature = {key:[] for key in keys}
 

@@ -4,6 +4,7 @@ from typing import override
 from copy import deepcopy
 
 from .DBWriter import DBWriter
+from exceptions import DataLengthMismatchError, ColumnMismatchError
 
 
 class CSVWriter(DBWriter): 
@@ -42,9 +43,9 @@ class CSVWriter(DBWriter):
                 
 
             elif column_names != self._column_names: 
-                raise ValueError(
+                raise ColumnMismatchError(
                 f"""CSV schema mismatch: expected columns {self._column_names}
-                    but found {column_names}, len file is {os.path.getsize(self._path)}""" )
+                    but found {column_names}.""" )
             
         else: 
             with open(self._path, "w", newline="") as csv_file: 
@@ -55,11 +56,12 @@ class CSVWriter(DBWriter):
     @override
     def _buffer(self, column_names:list[str], values:list[str]) -> None:
         if len(column_names) != len(values): 
-            raise ValueError("Number of column names not equal to number of values.")
+            raise DataLengthMismatchError("Number of column names not equal to number of values.")
 
-        for column in column_names: 
-            if column not in self._column_names: 
-                raise ValueError(f"Column {column} not a column of the DBWriter.")
+        if column_names != self._column_names: 
+            raise ColumnMismatchError(
+                f"""CSV schema mismatch: expected columns {self._column_names}
+                    but found {column_names}.""" )
 
         self._rows.append(tuple(values))
         self._current_buffer_size += 1
@@ -84,6 +86,7 @@ class CSVWriter(DBWriter):
     @override
     def get_free_space(self) -> int:
         return self._max_buffer_size - self._current_buffer_size
+
 
     @override
     def get_column_names(self):

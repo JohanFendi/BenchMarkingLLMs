@@ -5,6 +5,7 @@ from ..DBreading.DatasetReader import DatasetReader
 from .FeatureProcessing import buildMergedFeature
 from .PromptPreprocessor import PromptPreprocessor
 from .TestPreprocessor import TestPreprocessor
+from exceptions import DataLengthMismatchError
 
 
 class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor): 
@@ -24,7 +25,7 @@ class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor):
         self._cache_Point(index)
         features = ["private_tests", "public_tests", "generated_tests"]
         keys = ["input", "output"]
-        tests_dict = buildMergedFeature(self._cached_point, features, keys)
+        tests_dict = buildMergedFeature(self._cached_point, features, keys) #Throws NestedTypeMIsmatchError
         return tests_dict
 
 
@@ -43,11 +44,11 @@ class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor):
         test_inputs, expected_outputs = public_tests["input"], public_tests["output"]
 
         if len(test_inputs) != len(expected_outputs): 
-            raise ValueError(f"Mismatched lengths: test input has {len(test_inputs)}, test output has {len(expected_outputs)}.")
+            raise DataLengthMismatchError(f"Mismatched lengths: public test {index} input has {len(test_inputs)}, output has {len(expected_outputs)}.")
         
         strings = []
         for i, (input_str, output_str) in enumerate(zip(test_inputs, expected_outputs)): 
-            strings.append(f"Public test {i+1}:\nInput:\n{input_str}\nOutput:\n{output_str}")
+            strings.append(f"Public test {i+1}:\nInput:\n{input_str}\nExpected Output:\n{output_str}")
 
         return "\n".join(strings)
 
