@@ -13,6 +13,8 @@ from src.SolutionTesting.Tester import Tester
 from src.DataManagment.DBwriting.csvWriter import CSVWriter
 from src.LLMPrompting.GPTPrompter import GPTPrompter
 import constants 
+import AITaskDescriptions
+import ExampleData
 
 
 dataset = load_dataset("deepmind/code_contests")["train"]
@@ -37,7 +39,7 @@ verbose = True
 #Tests total pipeline health 
 def test_case_zero_with_mock_solution():     
     index = 0
-    mock_solution = constants.PROBLEM_ONE_SOLUTION
+    mock_solution = ExampleData.EX_0_SOLUTION
    
     folder_creator.init_folders(folder_name, [pid])
     solution_writer.write_solution(file_name, folder_name, pid, mock_solution, ".hs")
@@ -63,7 +65,8 @@ def test_first_ten_with_OpenAI():
     for i in range(10): 
       formated_public_tests = preprocessor.getFormatedPublicTests(i)
       problem_description = preprocessor.getProblemDescription(i)
-      solution = llm_prompter.prompt(constants.SYSTEM_PROMPT, constants.TASK_DESCRIPTION, problem_description, formated_public_tests)
+      solution = llm_prompter.prompt(constants.SYSTEM_PROMPT, AITaskDescriptions.HASKELL_TASK_DESCRIPTION, 
+                                     problem_description, formated_public_tests)
       solution_writer.write_solution(file_name, folder_name, pid, solution, ".hs")
       command, return_code, stderr = compiler.compile(pid, folder_name, file_name)
 
