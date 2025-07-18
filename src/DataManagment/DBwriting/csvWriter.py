@@ -4,7 +4,7 @@ from typing import override
 from copy import deepcopy
 
 from .DBWriter import DBWriter
-from exceptions import DataLengthMismatchError, ColumnMismatchError
+from src.Exceptions import DataLengthMismatchError, ColumnMismatchError
 
 
 class CSVWriter(DBWriter): 
@@ -35,7 +35,6 @@ class CSVWriter(DBWriter):
                 reader = csv.reader(f)
                 column_names = next(reader)
 
-          
             if len(column_names) == 0: 
                 with open(self._path, "w", newline="") as csv_file: 
                     writer = csv.writer(csv_file)

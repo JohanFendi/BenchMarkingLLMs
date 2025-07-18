@@ -24,3 +24,13 @@ class WrongOSError(OSError):
 #Thrown by DBWriters
 class ColumnMismatchError(Exception): 
     pass
+
+
+#Thrown by LLMPrompters
+class APIKeyNotFoundError(Exception): 
+    pass
+
+
+#Thrown by remove_code_fence
+class CodeFenceNotFoundError(Exception): 
+    pass

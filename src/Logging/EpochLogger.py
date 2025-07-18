@@ -1,7 +1,6 @@
 from typing import TypeVar
-from logging import Logger
 
-from CustomLogging import get_logger
+from src.Logging.GetLogger import get_logger
 from constants import EPOCH_LOG_FILE_NAME, EPOCH_LOGGER_NAME, LOGGER_FORMAT
 
 
@@ -10,8 +9,9 @@ class EpochLogger():
     def __init__(self, epoch_size:int) -> None:
         self._logger = get_logger(LOGGER_FORMAT, EPOCH_LOGGER_NAME, EPOCH_LOG_FILE_NAME)
         self._epoch_size = epoch_size
-        self._epoch_ai_time, self._epoch_pipeline_time, self._epoch_id, self._epoch_num_itr = 0
+        self._epoch_ai_time = self._epoch_pipeline_time = self._epoch_id = self._epoch_num_itr = 0
         self._epoch_status_occurences = {}
+    
     
     def update_epoch(self, 
                     ai_time:int, 
@@ -30,7 +30,7 @@ class EpochLogger():
             self._epoch_status_occurences[status] = 1
 
         if self._epoch_num_itr == self._epoch_size: 
-            self.log_epoch(self._epoch_size)
+            self.log_epoch()
             self._epoch_id += 1
             self._epoch_ai_time = self._epoch_pipeline_time = self._epoch_num_itr = 0
             self._epoch_status_occurences = {}
@@ -43,6 +43,7 @@ class EpochLogger():
         
         avg_pipeline_time = self._epoch_pipeline_time / self._epoch_num_itr
         avg_ai_time = self._epoch_ai_time / self._epoch_num_itr
+        self._logger.info(f"\nEpoch {self._epoch_id}:")
         self._logger.info(f"Average AI prompting time for epoch {self._epoch_id}: {round(avg_ai_time, 2)}")
         self._logger.info(f"Average pipeline time for epoch {self._epoch_id}: {round(avg_pipeline_time, 2)}")
         self._logger.info(f"Percentages for statuses: " + EpochLogger._get_percentages_str(self._epoch_status_occurences, self._epoch_num_itr))
@@ -58,7 +59,7 @@ class EpochLogger():
 
         for key in keys: 
             occur = occurences_dict[key] 
-            percentage = (occur / total_num_occur) * 100
-            percentages.append(f"| {key}: {percentage}")
+            percentage = round((occur / total_num_occur) * 100, 2)
+            percentages.append(f"| {key}: {percentage} ")
 
         return "".join(percentages)

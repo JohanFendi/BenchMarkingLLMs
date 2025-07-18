@@ -16,5 +16,5 @@ class OllamaPrompter(LLMPrompter):
                 {"role": "user", "content": f"**Formated Public Tests**: {formated_public_tests}"}
               ]
         
-        response = chat(self._model, messages=log)
+        response = chat(self._model, messages=log, stream=False)
         return response.message.content

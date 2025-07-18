@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import override
-from exceptions import DirectoryNotFoundError
+from src.Exceptions import DirectoryNotFoundError
 
 from .SolutionWriter import SolutionWriter
 
@@ -15,7 +15,7 @@ class RegularSolutionWriter(SolutionWriter):
 
         #Remove postfix
         if postfix in file_name and file_name[len(file_name)-len(postfix):] == postfix: 
-            file_name = file_name[:len(file_name)-3] 
+            file_name = file_name[:len(file_name)-len(postfix)] 
             
         #Create file and write solution
         with open(f"{folder_name}/{process_id}/{file_name}{postfix}", "w") as haskell_file: 

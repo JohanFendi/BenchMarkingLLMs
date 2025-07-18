@@ -1,15 +1,16 @@
 from typing import override
 
+
 from src.apiKey import load_api_key
 from src.LLMPrompting.LLMPrompter import LLMPrompter
 from src.LLMPrompting.OpenAIPrompter import OpenAIPrompter
 
 
-class AkashPrompter(LLMPrompter): 
+class DeepseekPrompter(LLMPrompter): 
 
     def __init__(self, model:str) -> None:  
-        key = load_api_key("AKASH_API_KEY")
-        url = "https://chatapi.akash.network/api/v1"
+        key = load_api_key("DEEPSEEK_API_KEY")
+        url = "https://api.deepseek.com"
         self._open_ai_prompter = OpenAIPrompter(model, key, url)
 
 

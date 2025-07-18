@@ -4,7 +4,7 @@ from subprocess import run
 from sys import platform
 
 from .Compiler import Compiler
-from exceptions import WrongOSError
+from src.Exceptions import WrongOSError
 
 
 class WindowsGhcCompiler(Compiler): 
@@ -16,11 +16,14 @@ class WindowsGhcCompiler(Compiler):
         """
         Compiles file and returns executable command.
         """ 
+        #Remove postfix
+        if ".hs" in file_name and file_name[len(file_name)-3:] == ".hs": 
+            file_name = file_name[:len(file_name)-3] 
        
         #Check flie exists
         file_path = f"{folder_name}/{process_id}/{file_name}"
         if not Path(f"{file_path}.hs").exists(): 
-            raise FileNotFoundError(f"File {file_path} not found.")
+            raise FileNotFoundError(f"File {file_path}.hs not found.")
         
         #Check OS is Windows
         if not platform.startswith("win"): 

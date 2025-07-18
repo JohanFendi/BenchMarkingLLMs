@@ -1,6 +1,6 @@
 from typing import TypeVar
 
-from exceptions import NestedTypeMismatchError
+from src.Exceptions import NestedTypeMismatchError, CodeFenceNotFoundError
 
 
 T = TypeVar("T")
@@ -40,3 +40,22 @@ def compareTypes(correctly_typed_dict:T, a:T) -> bool:
         return False
 
     return all(compareTypes(correctly_typed_dict[key], a[key]) for key in correctly_typed_dict.keys())
+
+
+def remove_code_fence(identifier:str, solution_string:str) -> str:
+    string_lower = solution_string.lower()
+    identifier = identifier.lower()
+    start = f"```{identifier}"
+    start_idx = string_lower.rfind(start)
+
+    if start_idx == -1: 
+        raise CodeFenceNotFoundError(f"Excpected start of code fence, '{start}', not found in solution string :{solution_string}")
+    
+    solution_string = solution_string[start_idx+len(start):]
+
+    end = "```"
+    end_idx = solution_string.find(end)
+    if end_idx == -1: 
+        raise CodeFenceNotFoundError(f"Excpected end of code fence, '{end}', not found in solution string :{solution_string}")
+
+    return solution_string[:end_idx]

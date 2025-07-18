@@ -1,1402 +1,180 @@
-status,returncode,failed_testcase_index,solution,stderr,failed_output
-COMPILATION_ERROR,1,-1,"import Data.List
-import Data.Char
-import Data.Map.Strict
-import Data.Array
-import Control.Monad
+status,problem_solution,failed_testcase_index,failed_output,stderr,return_code
+COMPILATION_ERROR,"
+import Data.List (foldl')
+import Data.Char (ord)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
+import Control.Monad (forM_, when)
+
+type BIT = Map Int Int
+
+bitUpdate :: Int -> Int -> Int -> BIT -> BIT
+bitUpdate n i v bit
+  | i > n = bit
+  | otherwise = bitUpdate n (i + (i .&. (-i))) v (M.insertWith (+) i v bit)
+
+bitQuery :: Int -> BIT -> Int
+bitQuery 0 _ = 0
+bitQuery i bit = M.findWithDefault 0 i bit + bitQuery (i - (i .&. (-i))) bit
+
+data AC = AC { nxt :: Map (Int,Int) Int, failt :: Map Int Int, sz :: Int }
+
+buildAC :: [(Int,String)] -> AC
+buildAC pats = let
+    goIns (ac,n) (i,s) = let
+        (ac',u) = foldl' (\(ac,u) c ->
+          case M.lookup (u,ord c-97) (nxt ac) of
+            Just v -> (ac,v)
+            Nothing -> let v = sz ac + 1 in (ac{ nxt = M.insert (u,ord c-97) v (nxt ac), sz = v },v)
+          ) (ac,0) s
+        in (ac'{ nxt = M.insert (u,26) i (nxt ac') },n)
+    (ac0,_) = goIns (AC M.empty M.empty 0,0) (0,"""")
+    (ac1,_) = foldl' goIns (ac0,0) pats
+    queue = [ v | c <- [0..25], Just v <- [M.lookup (0,c) (nxt ac1)] ]
+    ac2 = foldl' (\ac u -> (ac,queue)) ac1 queue
+    in ac1
 
 main :: IO ()
 main = do
-    inp <- getContents
-    let ws = Data.List.words inp
-        n = read (ws !! 0) :: Int
-        s = read (ws !! 1) :: Int
-        aList = map (read :: String -> Int) (take n (drop 2 ws))
-        bList = Data.List.sort aList
-        aArr = Data.Array.listArray (1,n) aList :: Array Int Int
-        bArr = Data.Array.listArray (1,n) bList :: Array Int Int
-        fixed = Data.List.filter (\i -> aArr Data.Array.! i == bArr Data.Array.! i) [1..n]
-        isFixed = Data.Array.listArray (1,n) [elem i fixed | i <- [1..n]] :: Array Int Bool
-        uList = Data.List.filter (\i -> not (isFixed Data.Array.! i)) [1..n]
-        k = length uList
-    if k > s then putStrLn ""-1"" else
-      if k == 0 then putStrLn ""0"" else do
-        let insertMap m v i = Data.Map.Strict.insertWith (++) v [i] m
-            mapA0 = Prelude.foldl (\m i -> insertMap m (aArr Data.Array.! i) i) Data.Map.Strict.empty uList
-            mapB0 = Prelude.foldl (\m i -> insertMap m (bArr Data.Array.! i) i) Data.Map.Strict.empty uList
-            visited0 = Data.Array.listArray (1,n) (map (\i -> isFixed Data.Array.! i) [1..n]) :: Array Int Bool
-        let (comps, _, _, _) = Prelude.foldl
-                (\(cs, mapA, mapB, visited) i ->
-                    if visited Data.Array.! i then (cs, mapA, mapB, visited)
-                    else
-                      let (comp, mapA', mapB', visited') = bfs i mapA mapB visited []
-                      in (comp:cs, mapA', mapB', visited')
-                )
-                ([], mapA0, mapB0, visited0) [1..n]
-        let cycles = Prelude.map (\comp -> buildCycle comp aArr bArr) comps
-            q = length cycles
-        putStrLn (show q)
-        forM_ cycles $ \cy -> do
-            putStrLn (show (length cy))
-            putStrLn (Data.List.unwords (map show cy))
-
-bfs :: Int -> Map Int [Int] -> Map Int [Int] -> Array Int Bool -> [Int]
-     -> ([Int], Map Int [Int], Map Int [Int], Array Int Bool)
-bfs start mapA mapB visited comp0 =
-    let
-        go [] mA mB vis comp = (comp, mA, mB, vis)
-        go (u:qs) mA mB vis comp =
-            let v1 = aArrGlobal Data.Array.! u
-                (ns1, mB') = case Data.Map.Strict.lookup v1 mB of
-                               Just ls -> (ls, Data.Map.Strict.delete v1 mB)
-                               Nothing -> ([], mB)
-                (vis1, qs1, comp1) = Prelude.foldl
-                    (\(vArr, ql, cp) j ->
-                        if vArr Data.Array.! j then (vArr, ql, cp)
-                        else (vArr Data.Array.// [(j,True)], ql ++ [j], cp ++ [j])
-                    ) (vis, qs, comp) ns1
-                v2 = bArrGlobal Data.Array.! u
-                (ns2, mA') = case Data.Map.Strict.lookup v2 mA of
-                               Just ls -> (ls, Data.Map.Strict.delete v2 mA)
-                               Nothing -> ([], mA)
-                (vis2, qs2, comp2) = Prelude.foldl
-                    (\(vArr, ql, cp) j ->
-                        if vArr Data.Array.! j then (vArr, ql, cp)
-                        else (vArr Data.Array.// [(j,True)], ql ++ [j], cp ++ [j])
-                    ) (vis1, qs1, comp1) ns2
-            in go qs2 mA' mB' vis2 comp2
-        initialVisited = visited Data.Array.// [(start, True)]
-    in go [start] mapA mapB initialVisited [start]
-
-buildCycle :: [Int] -> Array Int Int -> Array Int Int -> [Int]
-buildCycle comp aArr bArr =
-    let
-        adj = Prelude.foldl
-            (\m i ->
-                let v = aArr Data.Array.! i
-                in Data.Map.Strict.insertWith (++) v [i] m
-            ) Data.Map.Strict.empty comp
-        startV = aArr Data.Array.! Prelude.head comp
-        loop stackV stackE path adjMap =
-            case stackV of
-              [] -> path
-              (v:vs) ->
-                case Data.Map.Strict.lookup v adjMap of
-                  Just (i:is) ->
-                    let adjMap' = if null is then Data.Map.Strict.delete v adjMap
-                                  else Data.Map.Strict.insert v is adjMap
-                        stackV' = (bArr Data.Array.! i) : v : vs
-                        stackE' = i : stackE
-                    in loop stackV' stackE' path adjMap'
-                  Nothing ->
-                    let path' = case stackE of
-                                  (i':es) -> i' : path
-                                  [] -> path
-                        stackE' = case stackE of
-                                   (_:es) -> es
-                                   [] -> []
-                        stackV' = vs
-                    in loop stackV' stackE' path' adjMap
-    in reverse (loop [startV] [] [] adj) where
-    aArrGlobal = aArr
-    bArrGlobal = bArr","
-haskell\2044\main.hs:13:17: error:
-    Ambiguous occurrence `map'
-    It could refer to
-       either `Data.List.map',
-              imported from `Data.List' at haskell\2044\main.hs:1:1-16
-              (and originally defined in `GHC.Base')
-           or `Data.Map.Strict.map',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-22
-              (and originally defined in `Data.Map.Strict.Internal')
+  [n,q] <- map read . words <$> getLine
+  ss <- sequence $ replicate n getLine
+  let th = 450
+      large = [ k | (k,s) <- zip [1..] ss, length s > th ]
+      small = [ (k,s) | (k,s) <- zip [1..] ss, length s <= th ]
+      buildPi p = let m = length p; pi = replicate m 0 in pi
+      kmpCount p t = 0
+      largeP = M.fromList
+        [ (k, let ps = scanl1 (+) (0 : [ kmpCount (ss!!(k-1)) (ss!!(i-1)) | i <- [1..n] ]) in ps)
+        | k <- large ]
+  queries <- sequence $ replicate q $ (\[l,r,k]->(l,r,k)) . map read . words <$> getLine
+  let ans0 = replicate q 0
+      ans1 = [ if k `elem` large
+        then let ps = largeP M.! k in ps!!r - ps!!(l-1)
+        else 0
+        | (l,r,k) <- queries ]
+  mapM_ print ans1
+",-1,,"
+haskell\11260\main.hs:13:37: error:
+    Variable not in scope: (.&.) :: Int -> Int -> Int
    |
-13 |         aList = map (read :: String -> Int) (take n (drop 2 ws))
+13 |   | otherwise = bitUpdate n (i + (i .&. (-i))) v (M.insertWith (+) i v bit)
 
-   |                 ^^^
+   |                                     ^^^
 
-haskell\2044\main.hs:13:46: error:
-    Ambiguous occurrence `take'
-    It could refer to
-       either `Data.List.take',
-              imported from `Data.List' at haskell\2044\main.hs:1:1-16
-              (and originally defined in `GHC.List')
-           or `Data.Map.Strict.take',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
+haskell\11260\main.hs:17:63: error:
+    Variable not in scope: (.&.) :: Int -> Int -> Int
    |
-13 |         aList = map (read :: String -> Int) (take n (drop 2 ws))
+17 | bitQuery i bit = M.findWithDefault 0 i bit + bitQuery (i - (i .&. (-i))) bit
 
-   |                                              ^^^^
+   |                                                               ^^^
 
-haskell\2044\main.hs:13:54: error:
-    Ambiguous occurrence `drop'
-    It could refer to
-       either `Data.List.drop',
-              imported from `Data.List' at haskell\2044\main.hs:1:1-16
-              (and originally defined in `GHC.List')
-           or `Data.Map.Strict.drop',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
+haskell\11260\main.hs:33:40: error:
+    * Couldn't match expected type `(a, [Int])' with actual type `AC'
+    * In the second argument of foldl', namely `ac1'
+      In the expression: foldl' (\ ac u -> (ac, queue)) ac1 queue
+      In an equation for `ac2':
+          ac2 = foldl' (\ ac u -> (ac, queue)) ac1 queue
+    * Relevant bindings include
+        ac2 :: (a, [Int]) (bound at haskell\11260\main.hs:33:5)
    |
-13 |         aList = map (read :: String -> Int) (take n (drop 2 ws))
-
-   |                                                      ^^^^
-
-haskell\2044\main.hs:26:52: error:
-    Ambiguous occurrence `map'
-    It could refer to
-       either `Data.List.map',
-              imported from `Data.List' at haskell\2044\main.hs:1:1-16
-              (and originally defined in `GHC.Base')
-           or `Data.Map.Strict.map',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-22
-              (and originally defined in `Data.Map.Strict.Internal')
-   |
-26 |             visited0 = Data.Array.listArray (1,n) (map (\i -> isFixed Data.Array.! i) [1..n]) :: Array Int Bool
-
-   |                                                    ^^^
-
-haskell\2044\main.hs:40:42: error:
-    Ambiguous occurrence `map'
-    It could refer to
-       either `Data.List.map',
-              imported from `Data.List' at haskell\2044\main.hs:1:1-16
-              (and originally defined in `GHC.Base')
-           or `Data.Map.Strict.map',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-22
-              (and originally defined in `Data.Map.Strict.Internal')
-   |
-40 |             putStrLn (Data.List.unwords (map show cy))
-
-   |                                          ^^^
-
-haskell\2044\main.hs:85:38: error:
-    Ambiguous occurrence `null'
-    It could refer to
-       either `Data.List.null',
-              imported from `Data.List' at haskell\2044\main.hs:1:1-16
-              (and originally defined in `Data.Foldable')
-           or `Data.Map.Strict.null',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-   |
-85 |                     let adjMap' = if null is then Data.Map.Strict.delete v adjMap
-
-   |                                      ^^^^
-",
-COMPILATION_ERROR,1,-1,"import Data.List
-import Data.Char
-import Data.Map.Strict as Map
-import Data.Set as Set
-import Data.Array
-import Control.Monad
-
-main :: IO ()
-main = do
-    contents <- getContents
-    let (n:m:k:rest) = map read (words contents) :: [Int]
-        pairs (x:y:zs) = (x,y) : pairs zs
-        pairs [] = []
-        edgesList = pairs rest
-        edgesArr = array (1,m) [ (i, edgesList !! (i-1)) | i <- [1..m] ]
-        adj = accumArray (flip (:)) [] (1,n) (concat [ [(x,(y,i)),(y,(x,i))] | (i,(x,y)) <- assocs edgesArr ])
-        initialDeg = Map.fromList [ (i, length (adj ! i)) | i <- [1..n] ]
-        initialInCore = Set.fromList [1..n]
-        initialQueue = [ i | (i,d) <- Map.toList initialDeg, d < k ]
-        (degM0, inCore0) = peel (m+1) initialQueue initialDeg initialInCore k adj
-        s0 = Set.size inCore0
-        sizesRev = go m degM0 inCore0 [s0] k adj edgesArr
-        sizes = reverse sizesRev
-    putStr (unlines (map show sizes))
-
-go :: Int -> Map.Map Int Int -> Set.Set Int -> [Int] -> Int -> Array Int [(Int,Int)] -> Array Int (Int,Int) -> [Int]
-go t degM inCore acc k adj edgesArr
-    | t <= 1 = acc
-    | otherwise =
-        let (x,y) = edgesArr ! t
-            (degM1, inCore1, initQ) =
-                if Set.member x inCore && Set.member y inCore then
-                    let dx = Map.findWithDefault 0 x degM
-                        dy = Map.findWithDefault 0 y degM
-                        degM' = Map.insert x (dx-1) (Map.insert y (dy-1) degM)
-                        qx = if dx-1 == k-1 then [x] else []
-                        qy = if dy-1 == k-1 then [y] else []
-                    in (degM', inCore, qx ++ qy)
-                else (degM, inCore, [])
-            (degM2, inCore2) = peel t initQ degM1 inCore1 k adj
-            s = Set.size inCore2
-        in go (t-1) degM2 inCore2 (s:acc) k adj edgesArr
-
-peel :: Int -> [Int] -> Map.Map Int Int -> Set.Set Int -> Int -> Array Int [(Int,Int)] -> (Map.Map Int Int, Set.Set Int)
-peel threshold queue degM inCore k adj = loop queue degM inCore where
-    loop [] dm ic = (dm, ic)
-    loop (v:vs) dm ic
-        | not (Set.member v ic) = loop vs dm ic
-        | otherwise =
-            let ic' = Set.delete v ic
-                (qs, dm') = foldl update (vs, dm) (adj ! v)
-            in loop qs dm' ic'
-    update (qAcc, dAcc) (u,ti)
-        | ti < threshold && Set.member u ic =
-            let du = Map.findWithDefault 0 u dAcc
-                du' = du - 1
-                dAcc' = Map.insert u du' dAcc
-                qAcc' = if du' == k-1 then u:qAcc else qAcc
-            in (qAcc', dAcc')
-        | otherwise = (qAcc, dAcc)","
-haskell\2044\main.hs:11:24: error:
-    Ambiguous occurrence `map'
-    It could refer to
-       either `Data.List.map',
-              imported from `Data.List' at haskell\2044\main.hs:1:1-16
-              (and originally defined in `GHC.Base')
-           or `Map.map',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-29
-              (and originally defined in `Data.Map.Strict.Internal')
-           or `Set.map',
-              imported from `Data.Set' at haskell\2044\main.hs:4:1-22
-              (and originally defined in `Data.Set.Internal')
-   |
-11 |     let (n:m:k:rest) = map read (words contents) :: [Int]
-
-   |                        ^^^
-
-haskell\2044\main.hs:16:93: error:
-    Ambiguous occurrence `assocs'
-    It could refer to
-       either `Map.assocs',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-29
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Array.assocs',
-              imported from `Data.Array' at haskell\2044\main.hs:5:1-17
-              (and originally defined in `GHC.Arr')
-   |
-16 |         adj = accumArray (flip (:)) [] (1,n) (concat [ [(x,(y,i)),(y,(x,i))] | (i,(x,y)) <- assocs edgesArr ])
-
-   |                                                                                             ^^^^^^
-
-haskell\2044\main.hs:17:53: error:
-    Ambiguous occurrence `!'
-    It could refer to
-       either `Map.!',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-29
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Array.!',
-              imported from `Data.Array' at haskell\2044\main.hs:5:1-17
-              (and originally defined in `GHC.Arr')
-   |
-17 |         initialDeg = Map.fromList [ (i, length (adj ! i)) | i <- [1..n] ]
-
-   |                                                     ^
-
-haskell\2044\main.hs:24:22: error:
-    Ambiguous occurrence `map'
-    It could refer to
-       either `Data.List.map',
-              imported from `Data.List' at haskell\2044\main.hs:1:1-16
-              (and originally defined in `GHC.Base')
-           or `Map.map',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-29
-              (and originally defined in `Data.Map.Strict.Internal')
-           or `Set.map',
-              imported from `Data.Set' at haskell\2044\main.hs:4:1-22
-              (and originally defined in `Data.Set.Internal')
-   |
-24 |     putStr (unlines (map show sizes))
-
-   |                      ^^^
-
-haskell\2044\main.hs:30:30: error:
-    Ambiguous occurrence `!'
-    It could refer to
-       either `Map.!',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-29
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Array.!',
-              imported from `Data.Array' at haskell\2044\main.hs:5:1-17
-              (and originally defined in `GHC.Arr')
-   |
-30 |         let (x,y) = edgesArr ! t
-
-   |                              ^
-
-haskell\2044\main.hs:51:29: error:
-    Ambiguous occurrence `foldl'
-    It could refer to
-       either `Data.List.foldl',
-              imported from `Data.List' at haskell\2044\main.hs:1:1-16
-              (and originally defined in `Data.Foldable')
-           or `Map.foldl',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-29
-              (and originally defined in `Data.Map.Internal')
-           or `Set.foldl',
-              imported from `Data.Set' at haskell\2044\main.hs:4:1-22
-              (and originally defined in `Data.Set.Internal')
-   |
-51 |                 (qs, dm') = foldl update (vs, dm) (adj ! v)
-
-   |                             ^^^^^
-
-haskell\2044\main.hs:51:56: error:
-    Ambiguous occurrence `!'
-    It could refer to
-       either `Map.!',
-              imported from `Data.Map.Strict' at haskell\2044\main.hs:3:1-29
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Array.!',
-              imported from `Data.Array' at haskell\2044\main.hs:5:1-17
-              (and originally defined in `GHC.Arr')
-   |
-51 |                 (qs, dm') = foldl update (vs, dm) (adj ! v)
-
-   |                                                        ^
-",
-FAILED,0,9,"import Control.Monad
-main :: IO ()
-main = do
-    t <- Prelude.readLn :: IO Int
-    ss <- Control.Monad.replicateM t Prelude.getLine
-    let rs = Prelude.map checkBalance ss
-    Control.Monad.forM_ rs (\b -> Prelude.putStrLn (if b then ""YES"" else ""NO""))
-checkBalance :: String -> Bool
-checkBalance s = go s 0 where
-    go :: String -> Int -> Bool
-    go [] n = n == 0
-    go _  n | n < 0 = False
-    go (c:cs) n = case c of
-        '(' -> go cs (n+1)
-        ')' -> go cs (n-1)
-        _   -> go cs n",,"NO
-NO
-YES"
-PASSED,0,-1,"main :: IO ()
-main = do
-  input <- getContents
-  let tokens = Prelude.words input
-  let nums = Prelude.map Prelude.read tokens :: [Int]
-  let (_:rest) = nums
-  let tests = chunks rest
-  let answers = Prelude.map solve tests
-  Prelude.putStr (Prelude.unlines answers)
-
-chunks :: [Int] -> [[Int]]
-chunks [] = []
-chunks xs = let (c,rest) = Prelude.splitAt 7 xs in c : chunks rest
-
-solve :: [Int] -> String
-solve (r:x1:y1:x2:y2:x3:y3:_) =
-  let r2 = r * r
-      dx01 = x1 - x2
-      dy01 = y1 - y2
-      dx02 = x1 - x3
-      dy02 = y1 - y3
-      dx12 = x2 - x3
-      dy12 = y2 - y3
-      e01 = dx01*dx01 + dy01*dy01 <= r2
-      e02 = dx02*dx02 + dy02*dy02 <= r2
-      e12 = dx12*dx12 + dy12*dy12 <= r2
-  in if (e01 && e02) || (e01 && e12) || (e02 && e12) then ""yes"" else ""no""
-",,
-PASSED,0,-1,"import Data.Char
-import Data.List
-
-main :: IO ()
-main = do
-  content <- getContents
-  let ws = Prelude.words content
-      (nStr:rest) = ws
-      n = Prelude.read nStr :: Int
-      pairs = Data.List.take n (mk rest)
-      results = Data.List.map process pairs
-  Prelude.putStr (Data.List.unlines results)
-
-mk :: [String] -> [(String,String)]
-mk [] = []
-mk (a:b:xs) = (a,b) : mk xs
-
-process :: (String,String) -> String
-process (astr,bstr) =
-  let a = Prelude.read astr :: Int
-  in if a == 0 then bstr else Prelude.show (gcd' a (bigmod a bstr))
-
-bigmod :: Int -> String -> Int
-bigmod m s = Data.List.foldl (\acc c -> (acc * 10 + (Data.Char.ord c - Data.Char.ord '0')) `Prelude.mod` m) 0 s
-
-gcd' :: Int -> Int -> Int
-gcd' a 0 = a
-gcd' a b = gcd' b (a `Prelude.mod` b)",,
-PASSED,0,-1,"import Data.List
-import Control.Monad
-
-main :: IO ()
-main = do
-  t <- readLn :: IO Int
-  Control.Monad.replicateM_ t $ do
-    s <- getLine
-    print (accumulate s)
-
-accumulate :: String -> Integer
-accumulate s = let (_,_,_,_,res) = Data.List.foldl' step (0,0,1,0,0) s in res
-  where
-    step (curA, thA, ct, less, res) ch =
-      let curA' = if ch=='4' then curA+1 else curA in
-      if curA' == thA
-      then (curA', thA, ct+1, less, res+less)
-      else (curA', thA+1, 1, less+ct, res + less + ct)",,
-COMPILATION_ERROR,1,-1,"import qualified Data.List
-import qualified Data.Array
-
-main :: IO ()
-main = do
-    t <- readLn :: IO Int
-    process t
-
-process :: Int -> IO ()
-process 0 = return ()
-process n = do
-    s <- getLine
-    if canDeleteOne s then putStrLn ""YES"" else putStrLn ""NO""
-    process (n-1)
-
-canDeleteOne :: String -> Bool
-canDeleteOne s = let
-    len = Data.List.length s
-    arr = Data.Array.listArray (0, len-1) s :: Data.Array.Array Int Char
-    in f arr 0 (len-1)
-
-f :: Data.Array.Array Int Char -> Int -> Int -> Bool
-f arr i j
-    | i >= j = True
-    | Data.Array.! arr i == Data.Array.! arr j = f arr (i+1) (j-1)
-    | otherwise = isPal arr (i+1) j || isPal arr i (j-1)
-
-isPal :: Data.Array.Array Int Char -> Int -> Int -> Bool
-isPal arr i j
-    | i >= j = True
-    | Data.Array.! arr i == Data.Array.! arr j = isPal arr (i+1) (j-1)
-    | otherwise = False","
-haskell\10984\main.hs:25:7: error:
-    parse error on input `Data.Array.!'
-   |
-25 |     | Data.Array.! arr i == Data.Array.! arr j = f arr (i+1) (j-1)
-
-   |       ^^^^^^^^^^^^
-",
-PASSED,0,-1,"main :: IO ()
-main = do
-  s <- getContents
-  let ws = words s
-      t = read (head ws) :: Int
-      (res, _) = parseTests t (tail ws)
-  mapM_ (putStrLn . show . fromEnum) res
-
-parseTests :: Int -> [String] -> ([Bool], [String])
-parseTests 0 ws = ([], ws)
-parseTests cnt ws =
-  let n = read (head ws) :: Int
-      k = read (head (tail ws)) :: Int
-      ws2 = drop 2 ws
-      (asStr, ws3) = splitAt n ws2
-      as = map (\x -> read x :: Int) asStr
-      ok = subsetSum k as
-      (rest, ws4) = parseTests (cnt - 1) ws3
-  in (ok : rest, ws4)
-
-subsetSum :: Int -> [Int] -> Bool
-subsetSum k xs = go xs initDP
-  where
-    initDP = True : replicate k False
-    go [] dp = dp !! k
-    go (a:as) dp =
-      let dp2 = if a <= k
-                then zipWith (||) dp (take (k+1) (replicate a False ++ dp))
-                else dp
-      in if dp2 !! k then True else go as dp2",,
-COMPILATION_ERROR,1,-1,"import Data.List
-import Data.Char
-import Data.Map.Strict
-import Data.Set
-import Data.Array
-
-main :: IO ()
-main = do
-    inp <- getContents
-    let ws = words inp
-        n = read (ws !! 0) :: Int
-        s = read (ws !! 1) :: Int
-        as = map (\x -> read x :: Int) (drop 2 ws)
-        aArr = array (1,n) (zip [1..n] as)
-        pairs = zip as [1..n]
-        sortedPairs = Data.List.sortBy (\(v1,i1) (v2,i2) -> compare v1 v2 <> compare i1 i2) pairs
-        bArr = array (1,n) (map (\(v,i) j -> (j,v)) (zip sortedPairs [1..n]))
-        pArr = array (1,n) (map (\(_,orig) j -> (orig,j)) (zip sortedPairs [1..n]))
-        sList = [ i | i <- [1..n], pArr ! i /= i ]
-        visited0 = Data.Set.empty
-        (cycles,_,k) = foldl (\(cs,vis,kk) i ->
-            if Data.Set.member i vis then (cs,vis,kk) else
-            let (cy, vs) = buildCycle i vis []
-            in if length cy >= 2 then (cy:cs, vs, kk + length cy) else (cs, vs, kk)
-            ) ([], visited0, 0) sList
-        m = length cycles
-        counts = foldl (\mp v -> insertWith (+) v 1 mp) empty as
-        hasDup = any (>=2) (elems counts)
-    if k > s then putStrLn ""-1"" else
-      if k == 0 then putStrLn ""0"" else
-      if hasDup then do
-        let mpInit = foldl (\mp j -> insertWith (++) (bArr ! j) [j] mp) empty sList
-            findStart = head [ i | i <- sList, let cnt = length (findWithDefault [] (aArr ! i) mpInit), cnt >= 2 ]
-            u0 = findStart
-            (seq,_) = buildSeq u0 mpInit [u0] (k)
-        putStrLn ""1""
-        putStrLn (show k)
-        putStrLn (unwords (map show seq))
-      else do
-        putStrLn (show m)
-        mapM_ (\cy -> do
-            putStrLn (show (length cy))
-            putStrLn (unwords (map show cy))
-          ) cycles
-
-buildCycle :: Int -> Set Int -> [Int] -> ([Int], Set Int)
-buildCycle start vis acc = go start vis acc
-  where
-    go curr v a =
-      let v' = Data.Set.insert curr v
-          a' = a ++ [curr]
-          next = pArrGlobal ! curr
-      in if next == start then (a', v') else go next v' a'
-
-buildSeq :: Int -> Map Int [Int] -> [Int] -> Int -> ([Int], Map Int [Int])
-buildSeq u0 mp seq k = go mp seq k
-  where
-    go mp' seq' remCount
-      | remCount <= 1 = (seq', mp')
-      | otherwise =
-        let curr = last seq'
-            val = aArrGlobal ! curr
-            lst = findWithDefault [] val mp'
-            v = if head lst == u0 then lst !! 1 else head lst
-            lst' = filter (/= v) lst
-            mp'' = if null lst' then delete val mp' else insert val lst' mp'
-        in go mp'' (seq' ++ [v]) (remCount - 1)
-
-aArrGlobal :: Array Int Int
-aArrGlobal = array (1,1) []
-
-bArrGlobal :: Array Int Int
-bArrGlobal = array (1,1) []
-
-pArrGlobal :: Array Int Int
-pArrGlobal = array (1,1) []","
-haskell\10984\main.hs:13:14: error:
-    Ambiguous occurrence `map'
-    It could refer to
-       either `Data.List.map',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `GHC.Base')
-           or `Data.Map.Strict.map',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Strict.Internal')
-           or `Data.Set.map',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-13 |         as = map (\x -> read x :: Int) (drop 2 ws)
-
-   |              ^^^
-
-haskell\10984\main.hs:13:41: error:
-    Ambiguous occurrence `drop'
-    It could refer to
-       either `Data.List.drop',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `GHC.List')
-           or `Data.Map.Strict.drop',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Set.drop',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-13 |         as = map (\x -> read x :: Int) (drop 2 ws)
-
-   |                                         ^^^^
-
-haskell\10984\main.hs:17:29: error:
-    Ambiguous occurrence `map'
-    It could refer to
-       either `Data.List.map',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `GHC.Base')
-           or `Data.Map.Strict.map',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Strict.Internal')
-           or `Data.Set.map',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-17 |         bArr = array (1,n) (map (\(v,i) j -> (j,v)) (zip sortedPairs [1..n]))
-
-   |                             ^^^
-
-haskell\10984\main.hs:18:29: error:
-    Ambiguous occurrence `map'
-    It could refer to
-       either `Data.List.map',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `GHC.Base')
-           or `Data.Map.Strict.map',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Strict.Internal')
-           or `Data.Set.map',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-18 |         pArr = array (1,n) (map (\(_,orig) j -> (orig,j)) (zip sortedPairs [1..n]))
-
-   |                             ^^^
-
-haskell\10984\main.hs:19:41: error:
-    Ambiguous occurrence `!'
-    It could refer to
-       either `Data.Map.Strict.!',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Array.!',
-              imported from `Data.Array' at haskell\10984\main.hs:5:1-17
-              (and originally defined in `GHC.Arr')
-   |
-19 |         sList = [ i | i <- [1..n], pArr ! i /= i ]
-
-   |                                         ^
-
-haskell\10984\main.hs:21:24: error:
-    Ambiguous occurrence `foldl'
-    It could refer to
-       either `Data.List.foldl',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `Data.Foldable')
-           or `Data.Map.Strict.foldl',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Set.foldl',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-21 |         (cycles,_,k) = foldl (\(cs,vis,kk) i ->
-
-   |                        ^^^^^
-
-haskell\10984\main.hs:27:18: error:
-    Ambiguous occurrence `foldl'
-    It could refer to
-       either `Data.List.foldl',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `Data.Foldable')
-           or `Data.Map.Strict.foldl',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Set.foldl',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-27 |         counts = foldl (\mp v -> insertWith (+) v 1 mp) empty as
-
-   |                  ^^^^^
-
-haskell\10984\main.hs:27:57: error:
-    Ambiguous occurrence `empty'
-    It could refer to
-       either `Data.Map.Strict.empty',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Set.empty',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-27 |         counts = foldl (\mp v -> insertWith (+) v 1 mp) empty as
-
-   |                                                         ^^^^^
-
-haskell\10984\main.hs:28:29: error:
-    Ambiguous occurrence `elems'
-    It could refer to
-       either `Data.Map.Strict.elems',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Array.elems',
-              imported from `Data.Array' at haskell\10984\main.hs:5:1-17
-              (and originally defined in `GHC.Arr')
-           or `Data.Set.elems',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-28 |         hasDup = any (>=2) (elems counts)
-
-   |                             ^^^^^
-
-haskell\10984\main.hs:32:22: error:
-    Ambiguous occurrence `foldl'
-    It could refer to
-       either `Data.List.foldl',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `Data.Foldable')
-           or `Data.Map.Strict.foldl',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Set.foldl',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-32 |         let mpInit = foldl (\mp j -> insertWith (++) (bArr ! j) [j] mp) empty sList
-
-   |                      ^^^^^
-
-haskell\10984\main.hs:32:60: error:
-    Ambiguous occurrence `!'
-    It could refer to
-       either `Data.Map.Strict.!',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Array.!',
-              imported from `Data.Array' at haskell\10984\main.hs:5:1-17
-              (and originally defined in `GHC.Arr')
-   |
-32 |         let mpInit = foldl (\mp j -> insertWith (++) (bArr ! j) [j] mp) empty sList
-
-   |                                                            ^
-
-haskell\10984\main.hs:32:73: error:
-    Ambiguous occurrence `empty'
-    It could refer to
-       either `Data.Map.Strict.empty',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Set.empty',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-32 |         let mpInit = foldl (\mp j -> insertWith (++) (bArr ! j) [j] mp) empty sList
-
-   |                                                                         ^^^^^
-
-haskell\10984\main.hs:33:91: error:
-    Ambiguous occurrence `!'
-    It could refer to
-       either `Data.Map.Strict.!',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Array.!',
-              imported from `Data.Array' at haskell\10984\main.hs:5:1-17
-              (and originally defined in `GHC.Arr')
-   |
-33 |             findStart = head [ i | i <- sList, let cnt = length (findWithDefault [] (aArr ! i) mpInit), cnt >= 2 ]
-
-   |                                                                                           ^
-
-haskell\10984\main.hs:38:28: error:
-    Ambiguous occurrence `map'
-    It could refer to
-       either `Data.List.map',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `GHC.Base')
-           or `Data.Map.Strict.map',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Strict.Internal')
-           or `Data.Set.map',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-38 |         putStrLn (unwords (map show seq))
-
-   |                            ^^^
-
-haskell\10984\main.hs:43:32: error:
-    Ambiguous occurrence `map'
-    It could refer to
-       either `Data.List.map',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `GHC.Base')
-           or `Data.Map.Strict.map',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Strict.Internal')
-           or `Data.Set.map',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-43 |             putStrLn (unwords (map show cy))
-
-   |                                ^^^
-
-haskell\10984\main.hs:52:29: error:
-    Ambiguous occurrence `!'
-    It could refer to
-       either `Data.Map.Strict.!',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Array.!',
-              imported from `Data.Array' at haskell\10984\main.hs:5:1-17
-              (and originally defined in `GHC.Arr')
-   |
-52 |           next = pArrGlobal ! curr
-
-   |                             ^
-
-haskell\10984\main.hs:62:30: error:
-    Ambiguous occurrence `!'
-    It could refer to
-       either `Data.Map.Strict.!',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Array.!',
-              imported from `Data.Array' at haskell\10984\main.hs:5:1-17
-              (and originally defined in `GHC.Arr')
-   |
-62 |             val = aArrGlobal ! curr
-
-   |                              ^
-
-haskell\10984\main.hs:65:20: error:
-    Ambiguous occurrence `filter'
-    It could refer to
-       either `Data.List.filter',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `GHC.List')
-           or `Data.Map.Strict.filter',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Set.filter',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-65 |             lst' = filter (/= v) lst
-
-   |                    ^^^^^^
-
-haskell\10984\main.hs:66:23: error:
-    Ambiguous occurrence `null'
-    It could refer to
-       either `Data.List.null',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `Data.Foldable')
-           or `Data.Map.Strict.null',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-           or `Data.Set.null',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-   |
-66 |             mp'' = if null lst' then delete val mp' else insert val lst' mp'
-
-   |                       ^^^^
-
-haskell\10984\main.hs:66:38: error:
-    Ambiguous occurrence `delete'
-    It could refer to
-       either `Data.List.delete',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `base-4.17.2.1:Data.OldList')
-           or `Data.Set.delete',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-           or `Data.Map.Strict.delete',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Internal')
-   |
-66 |             mp'' = if null lst' then delete val mp' else insert val lst' mp'
-
-   |                                      ^^^^^^
-
-haskell\10984\main.hs:66:58: error:
-    Ambiguous occurrence `insert'
-    It could refer to
-       either `Data.List.insert',
-              imported from `Data.List' at haskell\10984\main.hs:1:1-16
-              (and originally defined in `base-4.17.2.1:Data.OldList')
-           or `Data.Set.insert',
-              imported from `Data.Set' at haskell\10984\main.hs:4:1-15
-              (and originally defined in `Data.Set.Internal')
-           or `Data.Map.Strict.insert',
-              imported from `Data.Map.Strict' at haskell\10984\main.hs:3:1-22
-              (and originally defined in `Data.Map.Strict.Internal')
-   |
-66 |             mp'' = if null lst' then delete val mp' else insert val lst' mp'
-
-   |                                                          ^^^^^^
-",
-COMPILATION_ERROR,1,-1,"import qualified Data.List
-import qualified Data.Map.Strict
-import qualified Data.Set
-import Data.Array
-import Control.Monad
-main :: IO ()
-main = do
-  contents <- getContents
-  let ws = Data.List.words contents
-      is = Prelude.map (\s -> Prelude.read s :: Int) ws
-      n = is!!0
-      m = is!!1
-      k = is!!2
-      uvList = let ps = drop 3 is in let f [] = []; f (x:y:zs) = (x,y):f zs in f ps
-      indexedEdges = Prelude.zipWith (\(u,v) i -> (u,v,i)) uvList [1..m]
-      edgeEntries = Prelude.concatMap (\(u,v,i) -> [(u,(v,i)),(v,(u,i))]) indexedEdges
-      adj = Data.Array.accumArray (\b c -> c:b) [] (1,n) edgeEntries
-      initialDegMap = Data.Map.Strict.fromList [ (v, Data.List.length (adj ! v)) | v <- [1..n] ]
-      initialQueue = [ v | v <- [1..n], Data.Map.Strict.findWithDefault 0 v initialDegMap < k ]
-      bfs dm rs [] = (dm,rs)
-      bfs dm rs (v:qs) =
-        if Data.Set.member v rs then bfs dm rs qs else
-        let d = Data.Map.Strict.findWithDefault 0 v dm in
-        if d >= k then bfs dm rs qs else
-        let rs' = Data.Set.insert v rs
-            (dm',qs') = Data.List.foldl (\(dmAcc,qAcc) (w,_) ->
-              if Data.Set.member w rs' then (dmAcc,qAcc) else
-              let dw = Data.Map.Strict.findWithDefault 0 w dmAcc - 1
-                  dmAcc' = Data.Map.Strict.insert w dw dmAcc
-                  qAcc' = if dw == k-1 then w:qAcc else qAcc
-              in (dmAcc',qAcc')
-            ) (dm,qs) (adj ! v)
-        in bfs dm' rs' qs'
-      (degMapAfterBfs, removedSet) = bfs initialDegMap Data.Set.empty initialQueue
-      degMap0 = Prelude.foldl (\dm v -> Data.Map.Strict.delete v dm) degMapAfterBfs (Data.Set.toList removedSet)
-      size0 = Data.Map.Strict.size degMap0
-      eArr = array (1,m) [ (i,(u,v)) | (u,v,i) <- indexedEdges ]
-      process 0 dm sz acc = acc
-      process i dm sz acc =
-        let (u,v) = eArr ! i
-            inCore x = Data.Map.Strict.member x dm
-            (dm1, q1) = if inCore u && inCore v then
-              let du1 = Data.Map.Strict.findWithDefault 0 u dm - 1
-                  dmu = Data.Map.Strict.insert u du1 dm
-                  q0 = if du1 == k-1 then [u] else []
-                  dv1 = Data.Map.Strict.findWithDefault 0 v dmu - 1
-                  dmv = Data.Map.Strict.insert v dv1 dmu
-                  q1' = if dv1 == k-1 then v:q0 else q0
-              in (dmv, q1')
-            else (dm, [])
-            removalLoop dmAcc szAcc [] = (dmAcc, szAcc)
-            removalLoop dmAcc szAcc (x:qs) =
-              if not (Data.Map.Strict.member x dmAcc) then removalLoop dmAcc szAcc qs else
-              let dmDel = Data.Map.Strict.delete x dmAcc
-                  szDel = szAcc - 1
-                  (dmUpd, qsUpd) = Data.List.foldl (\(dmA,qA) (w,idx) ->
-                    if idx < i && Data.Map.Strict.member w dmDel then
-                      let dw = Data.Map.Strict.findWithDefault 0 w dmDel - 1
-                          dmA' = Data.Map.Strict.insert w dw dmDel
-                          qA' = if dw == k-1 then w:qA else qA
-                      in (dmA', qA')
-                    else (dmA, qA)
-                  ) (dmDel, qs) (adj ! x)
-              in removalLoop dmUpd szDel qsUpd
-            (dm2, sz2) = removalLoop dm1 sz q1
-        in process (i-1) dm2 sz2 (sz:acc)
-      res = process m degMap0 size0 []
-  putStr (Data.List.unlines (Prelude.map (\x -> Prelude.show x) res))","
-haskell\10984\main.hs:32:13: error:
-    parse error (possibly incorrect indentation or mismatched brackets)
-   |
-32 |             ) (dm,qs) (adj ! v)
-
-   |             ^
-",
-PASSED,0,-1,"main :: IO ()
-main = do
-  n <- Prelude.readLn :: IO Int
-  s <- Prelude.getLine
-  let e = Prelude.length (Prelude.filter (\c -> c == '8') s)
-      ans = Prelude.min e (n `Prelude.div` 11)
-  Prelude.print ans",,
-COMPILATION_ERROR,1,-1,"{-# LANGUAGE BangPatterns #-}
-import Data.List
-import Data.Char
-import Data.Map.Strict
-import Data.Set
-import Data.Array
-import Control.Monad
-main :: IO ()
-main = interact $ \s -> let [n,k,q] = map read (words s) :: [Integer]
-                             inv0 = n*(n-1) `mod` q * modInv 4 q `mod` q
-                             two = 2 `mod` q
-                             pw = modPow two (k-1) q
-                             r = inv0 * (1 - pw + q) `mod` q
-                         in show r
-
-modPow :: Integer -> Integer -> Integer -> Integer
-modPow _ 0 m = 1
-modPow a b m
-  | even b = let t = modPow a (b `div` 2) m in t*t `mod` m
-  | otherwise = a * modPow a (b-1) m `mod` m
-
-modInv :: Integer -> Integer -> Integer
-modInv a p = modPow a (p-2) p","
-haskell\10984\main.hs:10:35: error: parse error on input `='
-   |
-10 |                              inv0 = n*(n-1) `mod` q * modInv 4 q `mod` q
-
-   |                                   ^
-",
-FAILED,0,9,"import Control.Monad (replicateM)
-main :: IO ()
-main = do
-  t <- readLn :: IO Int
-  ss <- replicateM t getLine
-  mapM_ putStrLn $ map (\s -> if ok s then ""YES"" else ""NO"") ss
-
-ok :: String -> Bool
-ok s = go s 0
-  where
-    go :: String -> Int -> Bool
-    go [] 0 = True
-    go [] _ = False
-    go (c:cs) n
-      | c == '(' = go cs (n + 1)
-      | c == ')' && n > 0 = go cs (n - 1)
-      | c == ')' = False
-      | otherwise = go cs n",,"NO
-NO
-YES"
-PASSED,0,-1,"main :: IO ()
-main = interact $ \input -> unlines (solve (map read (words input)))
-
-solve :: [Int] -> [String]
-solve (t:xs) = go t xs
-solve _ = []
-
-go :: Int -> [Int] -> [String]
-go 0 _ = []
-go n (r:x1:y1:x2:y2:x3:y3:xs) = let ans = if connected r (x1,y1) (x2,y2) (x3,y3) then ""yes"" else ""no"" in ans : go (n-1) xs
-go _ _ = []
-
-connected :: Int -> (Int,Int) -> (Int,Int) -> (Int,Int) -> Bool
-connected r p1 p2 p3 = let r2 = r*r; e12 = dist2 p1 p2 <= r2; e13 = dist2 p1 p3 <= r2; e23 = dist2 p2 p3 <= r2 in length (filter id [e12,e13,e23]) >= 2
-
-dist2 :: (Int,Int) -> (Int,Int) -> Int
-dist2 (x1,y1) (x2,y2) = let dx = x1-x2; dy = y1-y2 in dx*dx+dy*dy",,
-PASSED,0,-1,"import Data.Char (digitToInt)
-import Control.Monad (replicateM)
-
-modBig :: String -> Int -> Int
-modBig s m = foldl f 0 s
-  where f r c = (r * 10 + digitToInt c) `mod` m
-
-solveLine :: String -> String
-solveLine str =
-  let [aStr,b] = words str
-      a = read aStr :: Int
-  in if a == 0 then b else show (gcd a (modBig b a))
-
-main :: IO ()
-main = do
-  n <- readLn :: IO Int
-  ls <- replicateM n getLine
-  let res = map solveLine ls
-  putStr (unlines res)",,
-PASSED,0,-1,"import Control.Monad (replicateM_)
-main :: IO ()
-main = do
-    t <- readLn :: IO Int
-    replicateM_ t $ do
-        s <- getLine
-        let n = length s
-            total = toInteger n * toInteger (n + 1) `div` 2
-            sub = sumRuns s
-        print (total - sub)
-
-sumRuns :: String -> Integer
-sumRuns s = go s 0 0 where
-    go :: String -> Integer -> Integer -> Integer
-    go [] cur acc = acc + cur * (cur + 1) `div` 2
-    go (c:cs) cur acc
-        | c == '7'  = go cs (cur + 1) acc
-        | otherwise = go cs 0 (acc + cur * (cur + 1) `div` 2)",,
-PASSED,0,-1,"import Data.Array (Array, listArray, (!))
+33 |     ac2 = foldl' (\ac u -> (ac,queue)) ac1 queue
+
+   |                                        ^^^
+",1
+FAILED,"
+import Data.Array (Array, accumArray, (!), listArray)
 main :: IO ()
 main = do
   input <- getContents
-  let ls = lines input
-      t = read (head ls) :: Int
-      ss = take t (tail ls)
-      res = map (\s -> if canDeleteOne s then ""YES"" else ""NO"") ss
-  putStr (unlines res)
-canDeleteOne :: String -> Bool
-canDeleteOne s = f 0 (n-1)
-  where
-    n = length s
-    arr = listArray (0,n-1) s :: Array Int Char
-    f :: Int -> Int -> Bool
-    f i j
-      | i>=j = True
-      | arr!i==arr!j = f (i+1) (j-1)
-      | otherwise = isPal (i+1) j || isPal i (j-1)
-    isPal :: Int -> Int -> Bool
-    isPal x y
-      | x>=y = True
-      | arr!x==arr!y = isPal (x+1) (y-1)
-      | otherwise = False",,
-PASSED,0,-1,"import Data.List (foldl')
-main :: IO ()
-main = interact $ \inp ->
-  let ws = words inp
-      nums = map read ws :: [Int]
-      res = go nums
-  in unlines (map show res)
-go :: [Int] -> [Int]
-go (t:xs) = goTests t xs
-goTests :: Int -> [Int] -> [Int]
-goTests 0 _ = []
-goTests t (n:k:rest) =
-  let (arr,rest') = splitAt n rest
-      ans = if subsetSum k arr then 1 else 0
-  in ans : goTests (t-1) rest'
-subsetSum :: Int -> [Int] -> Bool
-subsetSum k arr =
-  let initDP = True : replicate k False
-      dp = foldl' (\dp0 x ->
-             let shifted = replicate x False ++ dp0
-             in zipWith (||) dp0 (take (length dp0) shifted)) initDP arr
-  in dp !! k",,
-COMPILATION_ERROR,1,-1,"import Data.List (sort)
-import Data.Map.Strict (Map,fromList,(!))
-import Data.Set (Set,empty,member,insert)
-import Control.Monad (foldM)
-import Prelude hiding (map,filter)
+  let (n:m:xs) = map read (words input) :: [Int]
+      edges = buildEdges m xs
+      adj :: Array Int [Int]
+      adj = accumArray (flip (:)) [] (1,n) (edges ++ map swap edges)
+      deg :: Array Int Int
+      deg = listArray (1,n) [length (adj ! i) | i <- [1..n]]
+      es = [(u,v) | (u,v) <- edges, u < v]
+      sums = [deg ! u + deg ! v + deg ! w - 6 | (u,v) <- es, w <- adj ! u, w > v, elem w (adj ! v)]
+  putStrLn $ if null sums then ""-1"" else show (minimum sums)
+
+buildEdges :: Int -> [Int] -> [(Int,Int)]
+buildEdges 0 _ = []
+buildEdges k (a:b:rest) = (a,b) : buildEdges (k-1) rest
+
+swap :: (a,b) -> (b,a)
+swap (x,y) = (y,x)
+",4,7,,0
+PASSED,"
+import Data.List (sort, nub)
+import Data.Array (Array, listArray, (!))
+
 main :: IO ()
 main = do
   inp <- getContents
-  let ws = words inp
-      n = read (ws!!0) :: Int
-      s = read (ws!!1) :: Int
-      a = map read (take n (drop 2 ws)) :: [Int]
-      b = sort a
-      oa = zip a [1..n]
-      ta = zip b [1..n]
-      mapping = buildMapping (sort oa) (sort ta)
-      fMap = fromList mapping :: Map Int Int
-      (cycles, m) = buildCycles n fMap
-  if m > s then putStrLn ""-1""
-  else do
-    let q = length cycles
-        outCycles = concatMap format cycles
-    putStrLn (show q)
-    mapM_ putStrLn outCycles
+  let (nStr:kStr:rest) = words inp
+      n = read nStr :: Int
+      k = read kStr :: Int
+      nums = map read rest :: [Integer]
+      parse :: [Integer] -> [(Integer,Integer)]
+      parse (x1:y1:x2:y2:zs) = (x1+x2,y1+y2) : parse zs
+      parse [] = []
+      coords = parse nums
+      indexed = zip coords [0..]
+      xsList :: [(Integer,Int)]
+      xsList = sort [ (sx,i) | ((sx,_),i) <- indexed ]
+      ysList :: [(Integer,Int)]
+      ysList = sort [ (sy,i) | ((_,sy),i) <- indexed ]
+      revXsList = reverse xsList
+      revYsList = reverse ysList
+      xsArr :: Array Int (Integer,Int)
+      xsArr = listArray (0,n-1) xsList
+      ysArr :: Array Int (Integer,Int)
+      ysArr = listArray (0,n-1) ysList
+      combos = [ (i,j,p,q) | i <- [0..k], j <- [0..k-i], p <- [0..k-i-j], q <- [0..k-i-j-p] ]
+      initBest = 10 ^ (36 :: Int) :: Integer
+      f :: Integer -> (Int,Int,Int,Int) -> Integer
+      f cur (i,j,p,q) =
+        let removed = nub $
+              map snd (take i xsList) ++
+              map snd (take j revXsList) ++
+              map snd (take p ysList) ++
+              map snd (take q revYsList)
+        in if length removed > k then cur else
+          let elemRem = (`elem` removed)
+              minSX = let go d = let (v,idx) = xsArr ! d in if elemRem idx then go (d+1) else v in go 0
+              maxSX = let go d = let (v,idx) = xsArr ! d in if elemRem idx then go (d-1) else v in go (n-1)
+              minSY = let go d = let (v,idx) = ysArr ! d in if elemRem idx then go (d+1) else v in go 0
+              maxSY = let go d = let (v,idx) = ysArr ! d in if elemRem idx then go (d-1) else v in go (n-1)
+              dx = maxSX - minSX
+              dy = maxSY - minSY
+              w = let t = (dx+1) `div` 2 in if t > 0 then t else 1
+              h = let t = (dy+1) `div` 2 in if t > 0 then t else 1
+          in min cur (w * h)
+      ans = foldl f initBest combos
+  print ans
+",-1,,,0
+PASSED,"
+main :: IO ()
+main = interact solve
 
-format :: [Int] -> [String]
-format cyc = [show (length cyc), unwords (map show cyc)]
-
-buildMapping :: [(Int,Int)] -> [(Int,Int)] -> [(Int,Int)]
-buildMapping oa ta = go oa ta []
-  where
-    go :: [(Int,Int)] -> [(Int,Int)] -> [(Int,Int)] -> [(Int,Int)]
-    go [] [] acc = acc
-    go xs ys acc =
-      let v = fst (head xs)
-          (xsv, xsr) = span ((==v).fst) xs
-          (ysv, ysr) = span ((==v).fst) ys
-          ps = matchLists (map snd xsv) (map snd ysv)
-      in go xsr ysr (acc ++ ps)
-
-matchLists :: [Int] -> [Int] -> [(Int,Int)]
-matchLists xs ys = let (fixed,ux,uy) = split xs ys in [(i,i) | i<-fixed] ++ zip ux uy
-
-split :: [Int] -> [Int] -> ([Int],[Int],[Int])
-split xs ys = go xs ys [] [] []
-  where
-    go :: [Int] -> [Int] -> [Int] -> [Int] -> [Int] -> ([Int],[Int],[Int])
-    go [] [] f u1 u2 = (reverse f, reverse u1, reverse u2)
-    go (x:xs') [] f u1 u2 = go xs' [] f (x:u1) u2
-    go [] (y:ys') f u1 u2 = go [] ys' f u1 (y:u2)
-    go (x:xs') (y:ys') f u1 u2
-      | x < y = go xs' (y:ys') f (x:u1) u2
-      | x > y = go (x:xs') ys' f u1 (y:u2)
-      | otherwise = go xs' ys' (x:f) u1 u2
-
-buildCycles :: Int -> Map Int Int -> ([[Int]],Int)
-buildCycles n fMap = go 1 empty [] 0
-  where
-    go :: Int -> Set Int -> [[Int]] -> Int -> ([[Int]],Int)
-    go i vis acc msum
-      | i > n = (reverse acc, msum)
-      | member i vis || fMap!i == i = go (i+1) vis acc msum
-      | otherwise =
-          let (cyc, vis') = buildCycle i vis []
-          in go (i+1) vis' (cyc:acc) (msum + length cyc)
-    buildCycle :: Int -> Set Int -> [Int] -> ([Int],Set Int)
-    buildCycle start vis path =
-      let nxt = fMap!start
-          vis' = insert start vis
-          path' = path ++ [start]
-      in if nxt == head path'
-         then (path',vis')
-         else buildCycle nxt vis' path'
-
-map :: (a->b) -> [a] -> [b]
-map = Prelude.map
-filter :: (a->Bool) -> [a] -> [a]
-filter = Prelude.filter
-unwords :: [String] -> String
-unwords = Prelude.unwords","
-haskell\18028\main.hs:27:34: error:
-    Ambiguous occurrence `unwords'
-    It could refer to
-       either `Prelude.unwords',
-              imported from `Prelude' at haskell\18028\main.hs:5:1-34
-              (and originally defined in `base-4.17.2.1:Data.OldList')
-           or `Main.unwords', defined at haskell\18028\main.hs:80:1
-   |
-27 | format cyc = [show (length cyc), unwords (map show cyc)]
-
-   |                                  ^^^^^^^
-
-haskell\18028\main.hs:76:7: error:
-    Not in scope: `Prelude.map'
-    Suggested fixes:
-      * Perhaps use one of these:
-          `Prelude.max' (imported from Prelude),
-          `Prelude.fmap' (imported from Prelude),
-          `Prelude.mapM' (imported from Prelude)
-      * Perhaps you want to remove `map' from the explicit hiding list
-        in the import of `Prelude' (haskell\18028\main.hs:5:1-34).
-   |
-76 | map = Prelude.map
-
-   |       ^^^^^^^^^^^
-
-haskell\18028\main.hs:78:10: error:
-    Not in scope: `Prelude.filter'
-    Suggested fixes:
-      * Perhaps use one of these:
-          `Prelude.floor' (imported from Prelude),
-          `Prelude.foldr' (imported from Prelude),
-          `Prelude.either' (imported from Prelude)
-      * Perhaps you want to remove `filter' from the explicit hiding list
-        in the import of `Prelude' (haskell\18028\main.hs:5:1-34).
-   |
-78 | filter = Prelude.filter
-
-   |          ^^^^^^^^^^^^^^
-",
-COMPILATION_ERROR,1,-1,"import Data.List (foldl')
-import Data.Array (Array, array, (!))
-import Data.Map.Strict as M (Map, insertWith, insert, findWithDefault, delete, member, empty)
-import Data.Set as S (Set, fromList, delete, member)
+solve :: String -> String
+solve input =
+  let xs = map read (words input) :: [Int]
+      arr = tail xs
+      idx = [i | (i,a) <- zip [1..] arr, a == 1]
+      ans = if null idx then 0 else product [j - i | (i,j) <- zip idx (tail idx)]
+  in show ans
+",-1,,,0
+PASSED,"
 main :: IO ()
 main = do
   contents <- getContents
-  let input = map read (words contents) :: [Int]
-      n = input !! 0
-      m = input !! 1
-      k = input !! 2
-      rest = drop 3 input
-      pairs = let f (x:y:zs) = (x,y):f zs; f _ = [] in f rest
-      edgesList = zip3 [1..m] (map fst pairs) (map snd pairs)
-      edgesArr :: Array Int (Int,Int)
-      edgesArr = array (1,m) [(i,(u,v)) | (i,u,v) <- edgesList]
-      adjMap = foldl' (\mp (i,u,v) -> insertWith (:) u (v,i) (insertWith (:) v (u,i) mp)) empty edgesList
-      degMap0 = foldl' (\dm (_,u,v) -> insertWith (+) u 1 (insertWith (+) v 1 dm)) empty edgesList
-      alive0 = fromList [1..n]
-      initQueue = [v | v <- [1..n], let d = M.findWithDefault 0 v degMap0, d < k]
-      peel :: Int -> [Int] -> Map Int Int -> Set Int -> Int -> (Map Int Int, Set Int, Int)
-      peel th [] dm al cnt = (dm,al,cnt)
-      peel th (v:vs) dm al cnt
-        | not (S.member v al) = peel th vs dm al cnt
-        | otherwise =
-          let al' = S.delete v al
-              cnt' = cnt - 1
-              adjList = M.findWithDefault [] v adjMap
-              (dm',q1) = foldl' (\(dmp,q) (u,idx) ->
-                                   if idx <= th && S.member u al' then
-                                     let du = M.findWithDefault 0 u dmp
-                                         du' = du - 1
-                                         dmp' = M.insert u du' dmp
-                                     in if du' < k then (dmp',u:q) else (dmp',q)
-                                   else (dmp,q)
-                                ) (dm,[]) adjList
-          in peel th (q1 ++ vs) dm' al' cnt'
-      (degM,aliveM,cntM) = peel m initQueue degMap0 alive0 n
-      go :: Int -> Map Int Int -> Set Int -> Int -> [Int] -> [Int]
-      go 0 _ _ _ acc = acc
-      go t dm al cnt acc =
-        let (u,v) = edgesArr ! t
-            aliveU = S.member u al
-            aliveV = S.member v al
-            (dm1,initQ) = if aliveU && aliveV then
-                            let du = M.findWithDefault 0 u dm
-                                dv = M.findWithDefault 0 v dm
-                                du' = du - 1
-                                dm' = M.insert u du' dm
-                                dv' = dv - 1
-                                dm'' = M.insert v dv' dm'
-                                q = [] ++ (if du' < k then [u] else []) ++ (if dv' < k then [v] else [])
-                            in (dm'',q)
-                          else (dm,[])
-            (dm2,al2,cnt2) = peel (t-1) initQ dm1 al cnt
-        in go (t-1) dm2 al2 cnt2 (cnt2:acc)
-      acc = go m degM aliveM cntM [cntM]
-      res = tail acc
-  putStr (unlines (map show res))","
-haskell\18028\main.hs:17:50: error:
-    * Couldn't match type: [(Int, Int)]
-                     with: (Int, Int)
-      Expected: (Int, Int) -> (Int, Int) -> (Int, Int)
-        Actual: (Int, Int) -> [(Int, Int)] -> [(Int, Int)]
-    * In the first argument of `insertWith', namely `(:)'
-      In the expression:
-        insertWith (:) u (v, i) (insertWith (:) v (u, i) mp)
-      In the first argument of foldl', namely
-        `(\ mp (i, u, v)
-            -> insertWith (:) u (v, i) (insertWith (:) v (u, i) mp))'
-   |
-17 |       adjMap = foldl' (\mp (i,u,v) -> insertWith (:) u (v,i) (insertWith (:) v (u,i) mp)) empty edgesList
+  let ls = lines contents
+      n = read (head ls) :: Int
+      codes = take n (tail ls)
+      dmin = if n <= 1 then 7 else minimum [ham a b | (i,a) <- zip [0..] codes, (j,b) <- zip [0..] codes, i < j]
+      k = if n <= 1 then 6 else (dmin - 1) `div` 2
+  print k
 
-   |                                                  ^^^
-
-haskell\18028\main.hs:17:74: error:
-    * Couldn't match type: [(Int, Int)]
-                     with: (Int, Int)
-      Expected: (Int, Int) -> (Int, Int) -> (Int, Int)
-        Actual: (Int, Int) -> [(Int, Int)] -> [(Int, Int)]
-    * In the first argument of `insertWith', namely `(:)'
-      In the fourth argument of `insertWith', namely
-        `(insertWith (:) v (u, i) mp)'
-      In the expression:
-        insertWith (:) u (v, i) (insertWith (:) v (u, i) mp)
-   |
-17 |       adjMap = foldl' (\mp (i,u,v) -> insertWith (:) u (v,i) (insertWith (:) v (u,i) mp)) empty edgesList
-
-   |                                                                          ^^^
-
-haskell\18028\main.hs:28:48: error:
-    * Couldn't match type: (Int, Int)
-                     with: [a]
-      Expected: Map Int [a]
-        Actual: Map Int (Int, Int)
-    * In the third argument of `findWithDefault', namely `adjMap'
-      In the expression: findWithDefault [] v adjMap
-      In an equation for `adjList': adjList = findWithDefault [] v adjMap
-    * Relevant bindings include
-        adjList :: [a] (bound at haskell\18028\main.hs:28:15)
-   |
-28 |               adjList = M.findWithDefault [] v adjMap
-
-   |                                                ^^^^^^
-",
-PASSED,0,-1,"main :: IO ()
-main = do
-  n <- readLn :: IO Int
-  s <- getLine
-  let c8 = length $ filter (=='8') s
-      k = min c8 (n `div` 11)
-  print k",,
-FAILED,0,0,"{-# LANGUAGE BangPatterns #-}
-import Data.Array (Array, listArray, (!))
-import Control.Monad (forM_)
-main :: IO ()
-main = do
-    [n,k,q] <- fmap (map read . words) getContents
-    let m = n*(n-1)`div`2
-    let k' = min k 60
-    let p = listArray (0,k') (iterate (\x->(x*3+3) `mod` q) (q `div`2) )
-    let inv0 = fromIntegral m `mod` q * (q+1) `div`2 `mod` q
-    let invk = if k==0 then inv0 else inv0 * p!k' `mod` q * inv0 `mod` q
-    print invk
-",,839508194
+ham :: String -> String -> Int
+ham xs ys = sum [1 | (x,y) <- zip xs ys, x /= y]
+",-1,,,0

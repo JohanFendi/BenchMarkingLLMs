@@ -5,14 +5,15 @@ from ..DBreading.DatasetReader import DatasetReader
 from .FeatureProcessing import buildMergedFeature
 from .PromptPreprocessor import PromptPreprocessor
 from .TestPreprocessor import TestPreprocessor
-from exceptions import DataLengthMismatchError
+from src.Exceptions import DataLengthMismatchError
 
 
 class CodeContestsPreprocessor(TestPreprocessor, PromptPreprocessor): 
 
-    #dataset should be a slice of the following datastructure: 
-    #load_dataset("deepmind/code_contests")["train"] and thus of type Dataset. 
+    
     def __init__(self, dataset:Dataset): 
+        """dataset should be a slice of the following datastructure: 
+            load_dataset("deepmind/code_contests")["train"] and thus of type Dataset.""" 
         self._dataset_reader = DatasetReader(dataset)
         self._features = ["private_tests", "public_tests", "generated_tests", "description"]
         self._current_index = -1
