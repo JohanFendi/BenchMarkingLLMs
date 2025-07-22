@@ -4,7 +4,7 @@ from typing import override
 from copy import deepcopy
 
 from .DBWriter import DBWriter
-from src.Exceptions import DataLengthMismatchError, ColumnMismatchError
+from src.Exceptions import ColumnMismatchError
 
 
 class CSVWriter(DBWriter): 
@@ -19,9 +19,8 @@ class CSVWriter(DBWriter):
         self._max_buffer_size = max_buffer_size
         self._current_buffer_size = 0
         self._setup_database()
-        
-        
-    @override
+
+    
     def _setup_database(self):
     
         #If file exists and is non-empty, then we make sure 
@@ -43,8 +42,8 @@ class CSVWriter(DBWriter):
 
             elif column_names != self._column_names: 
                 raise ColumnMismatchError(
-                f"""CSV schema mismatch: expected columns {self._column_names}
-                    but found {column_names}.""" )
+                f"""CSV schema mismatch: expected columns {self._column_names} 
+                in {self._path} but found {column_names}.""" )
             
         else: 
             with open(self._path, "w", newline="") as csv_file: 
@@ -53,16 +52,14 @@ class CSVWriter(DBWriter):
         
 
     @override
-    def _buffer(self, column_names:list[str], values:list[str]) -> None:
-        if len(column_names) != len(values): 
-            raise DataLengthMismatchError("Number of column names not equal to number of values.")
+    def _buffer(self, data:dict[str, any]) -> None:
+        row = [data[col] for col in self._column_names]
+        
+        if len(row) != len(self._column_names): 
+            raise ColumnMismatchError(f"""Data mismatch. Columns of datapoint: {data.keys} 
+                                      do not match columns of CSVWriter : {self._column_names}.""")
 
-        if column_names != self._column_names: 
-            raise ColumnMismatchError(
-                f"""CSV schema mismatch: expected columns {self._column_names}
-                    but found {column_names}.""" )
-
-        self._rows.append(tuple(values))
+        self._rows.append(row)
         self._current_buffer_size += 1
 
 
@@ -78,7 +75,7 @@ class CSVWriter(DBWriter):
 
 
     @override
-    def _isBufferFull(self) -> bool: 
+    def _is_buffer_full(self) -> bool: 
         return self._current_buffer_size >= self._max_buffer_size
 
 

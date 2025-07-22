@@ -1,10 +1,12 @@
 from datasets import load_dataset
-from logging import getLogger
+from os import getpid
+from asyncio import run 
+from sys import exit
 
 
+from src.App import App
 from constants import *
 from LLMTaskDescriptions import HASKELL_TASK_DESCRIPTION
-from src.app import App
 from src.LLMPrompting.GPTPrompter import GPTPrompter
 from src.Compilation.ProcessFolderCreator import ProcessFolderCreator
 from src.Compilation.WindowsGhcCompiler import WindowsGhcCompiler
@@ -15,6 +17,9 @@ from src.SolutionWriting.RegularSolutionWriter import RegularSolutionWriter
 from src.SolutionTesting.Tester import Tester
 from src.Logging.EpochLogger import EpochLogger
 from src.Logging.GetLogger import get_logger
+from src.Pipeline import Pipeline
+from src.Scheduling.QueueScheduler import QueueScheduler
+
 
 
 file_postfix = ".hs"
@@ -25,9 +30,11 @@ column_names = AVAILABLE_COLUMNS
 llm_task_description = HASKELL_TASK_DESCRIPTION
 llm_system_prompt = SYSTEM_PROMPT
 max_buffer_size = 25
+max_parallell_ai_prompts = 5
 start_index = 7025
 end_index = 7030
 epoch_size = max_buffer_size
+
 
 #Pipeline components
 dataset = load_dataset("deepmind/code_contests")["train"]
@@ -40,19 +47,28 @@ db_writer = CSVWriter(csv_file_name, column_names, max_buffer_size)
 solution_tester = Tester()
 epoch_logger = EpochLogger(epoch_size)
 error_logger = get_logger(LOGGER_FORMAT, ERROR_LOGGER_NAME, ERROR_LOG_FILE_NAME)
+llm_scheduler = QueueScheduler(max_parallell_ai_prompts)
+
 
 
 if __name__ == "__main__":
     try: 
-        app = App(preprocessor, preprocessor, llm_prompter, 
-                folder_creator, compiler, solution_writer, 
-                db_writer, solution_tester, epoch_logger, 
-                error_logger, start_index, end_index)
-        app.run(llm_system_prompt, llm_task_description, programming_language, haskell_file_name, file_postfix)
+        pids = [str(getpid())]
+        pipeline = Pipeline(preprocessor, preprocessor, llm_prompter, folder_creator, 
+                            compiler, solution_writer, db_writer, solution_tester, 
+                            programming_language, pids, haskell_file_name, file_postfix)
+        app = App(pipeline, epoch_logger, error_logger, llm_scheduler,
+                    llm_system_prompt, llm_task_description, programming_language, 
+                    haskell_file_name, file_postfix)
+
+        
+        run(app.run(pids[0], start_index, end_index))
     except Exception as e: 
         db_writer.flush()
         epoch_logger.log_epoch()
         error_logger.exception("Uncaught exception:")
+        exit()
+
 
 
 

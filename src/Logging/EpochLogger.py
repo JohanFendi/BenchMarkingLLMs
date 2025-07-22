@@ -16,10 +16,10 @@ class EpochLogger():
     def update_epoch(self, 
                     ai_time:int, 
                     pipeline_time:int, 
-                    storage_time:int,
+                    db_write_time:int,
                     status:str) -> None: 
         
-        pipeline_time += storage_time   
+        pipeline_time += db_write_time   
         self._epoch_ai_time += ai_time
         self._epoch_pipeline_time += pipeline_time
         self._epoch_num_itr += 1

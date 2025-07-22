@@ -4,177 +4,224 @@ import Data.List (foldl')
 import Data.Char (ord)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
-import Control.Monad (forM_, when)
-
-type BIT = Map Int Int
-
-bitUpdate :: Int -> Int -> Int -> BIT -> BIT
-bitUpdate n i v bit
-  | i > n = bit
-  | otherwise = bitUpdate n (i + (i .&. (-i))) v (M.insertWith (+) i v bit)
-
-bitQuery :: Int -> BIT -> Int
-bitQuery 0 _ = 0
-bitQuery i bit = M.findWithDefault 0 i bit + bitQuery (i - (i .&. (-i))) bit
-
-data AC = AC { nxt :: Map (Int,Int) Int, failt :: Map Int Int, sz :: Int }
-
-buildAC :: [(Int,String)] -> AC
-buildAC pats = let
-    goIns (ac,n) (i,s) = let
-        (ac',u) = foldl' (\(ac,u) c ->
-          case M.lookup (u,ord c-97) (nxt ac) of
-            Just v -> (ac,v)
-            Nothing -> let v = sz ac + 1 in (ac{ nxt = M.insert (u,ord c-97) v (nxt ac), sz = v },v)
-          ) (ac,0) s
-        in (ac'{ nxt = M.insert (u,26) i (nxt ac') },n)
-    (ac0,_) = goIns (AC M.empty M.empty 0,0) (0,"""")
-    (ac1,_) = foldl' goIns (ac0,0) pats
-    queue = [ v | c <- [0..25], Just v <- [M.lookup (0,c) (nxt ac1)] ]
-    ac2 = foldl' (\ac u -> (ac,queue)) ac1 queue
-    in ac1
-
+import Data.Array (Array, listArray, accumArray, (!))
+import Control.Monad (forM_)
+type Node=Int
+type Triple=(Node,Node,Node)
+buildTrie :: [String] -> (Int,Map (Node,Char) Node,[Node])
+buildTrie ss = fst $ foldl' ins ( (1,M.empty,[]), ss ) ss where
+ ins ((n,mp,ends),s:ss') _ = let (n',mp',u)=foldl' step (n,mp,0) s in ((n',mp',u:ends),ss') where
+  step (n0,mp0,u0) c = case M.lookup (u0,c) mp0 of
+    Just v->(n0,mp0,v)
+    Nothing->(n0+1,M.insert (u0,c) n0 mp0,n0)
+buildChildrenList :: Int -> Map (Node,Char) Node -> Map Node [(Char,Node)]
+buildChildrenList n mp = M.fromListWith (++) [ (u,[(c,v)]) | ((u,c),v)<-M.toList mp ]
+buildFail :: Int -> Map Node [(Char,Node)] -> Map (Node,Char) Node -> Array Node Node
+buildFail n ch mp = listArray (0,n-1) $ elems where
+  go [] fl = fl
+  go (u:qs) fl = let fs = fl ! u in
+    let childs = M.findWithDefault [] u ch in
+    let (fl',qs') = foldl' (\(facc,qacc) (c,v) ->
+         let f0 = fs in
+         let f1 = findFail f0 c facc in
+         (facc//[(v,f1)], qacc++[v])
+       ) (fl,qs) childs in go qs fl'
+  findFail 0 c fl = case M.lookup (0,c) mp of Just v->v; Nothing->0
+  findFail f c fl = case M.lookup (f,c) mp of Just v->v; findFail (fl!f) c fl
+  elems = go (map snd $ M.findWithDefault [] 0 ch) (listArray (0,n-1) (0:replicate (n-1) 0))
+buildFailTree :: Int -> Array Node Node -> Map Node [Node]
+buildFailTree n fl = M.fromListWith (++) [(fl!v,[v]) | v<-[1..n-1]]
+dfsTinTout :: Map Node [Node] -> Node -> Int -> (Int,[Triple])
+dfsTinTout adj u cnt = let tin=cnt+1 in
+  let (cnt',acc) = case M.lookup u adj of
+        Nothing->(tin,[])
+        Just vs->foldl' (\(c,a) v -> let (c',r)=dfsTinTout adj v c in (c',a++r)) (tin,[]) vs in
+  let tout=cnt' in (cnt', (u,tin,tout):acc)
+data Seg = Nil | Seg !Int Seg Seg
+update :: Seg -> Int -> Int -> Int -> Seg
+update Nil l r pos
+  | l==r = Seg 1 Nil Nil
+  | pos<=m = let lch=update Nil l m pos in Seg 1 lch Nil
+  | otherwise = let rch=update Nil (m+1) r pos in Seg 1 Nil rch
+  where m=(l+r) `div` 2
+update (Seg s lch rch) l r pos
+  | l==r = Seg (s+1) Nil Nil
+  | pos<=m = let nl=update lch l m pos in Seg (s+1) nl rch
+  | otherwise = let nr=update rch (m+1) r pos in Seg (s+1) lch nr
+  where m=(l+r) `div` 2
+querySeg :: Seg -> Int -> Int -> Int -> Int -> Int
+querySeg Nil _ _ _ _ = 0
+querySeg (Seg s lch rch) l r ql qr
+  | ql<=l && r<=qr = s
+  | qr<l || r<ql = 0
+  | otherwise = querySeg lch l m ql qr + querySeg rch (m+1) r ql qr
+  where m=(l+r) `div` 2
 main :: IO ()
 main = do
-  [n,q] <- map read . words <$> getLine
-  ss <- sequence $ replicate n getLine
-  let th = 450
-      large = [ k | (k,s) <- zip [1..] ss, length s > th ]
-      small = [ (k,s) | (k,s) <- zip [1..] ss, length s <= th ]
-      buildPi p = let m = length p; pi = replicate m 0 in pi
-      kmpCount p t = 0
-      largeP = M.fromList
-        [ (k, let ps = scanl1 (+) (0 : [ kmpCount (ss!!(k-1)) (ss!!(i-1)) | i <- [1..n] ]) in ps)
-        | k <- large ]
-  queries <- sequence $ replicate q $ (\[l,r,k]->(l,r,k)) . map read . words <$> getLine
-  let ans0 = replicate q 0
-      ans1 = [ if k `elem` large
-        then let ps = largeP M.! k in ps!!r - ps!!(l-1)
-        else 0
-        | (l,r,k) <- queries ]
-  mapM_ print ans1
+  ls <- fmap lines getContents
+  let (h:rest)=ls
+      [n,q]=map read $ words h
+      (ss,qs')=splitAt n rest
+      qs = zip3 [1..] (map ((\[a,b,c]->(read a,read b,read c)) . words) qs')
+      (nodeCount,mp,endN) = buildTrie ss
+      childrenList = buildChildrenList nodeCount mp
+      fl = buildFail nodeCount childrenList mp
+      failTree = buildFailTree nodeCount fl
+      (_,triples) = dfsTinTout failTree 0 0
+      tin = M.fromList [(u,t) | (u,t,_)<-triples]
+      tout = M.fromList [(u,t) | (u,_,t)<-triples]
+      endNodeList = reverse endN
+      pointsAt = [ [] ] ++ [ let ys=[]; _=foldl' (\u c ->
+            let u1 = let rec x = case M.lookup (x,c) mp of Just v->v; Nothing-> if x==0 then 0 else rec (fl!x) in rec u in ys++[tin M.! u1]
+            in snd $ foldl' (\(u0,acc) c -> let rec x = case M.lookup (x,c) mp of Just v->v; Nothing-> if x==0 then 0 else rec (fl!x) in let u1=rec u0 in (u1,acc++[tin M.! u1])) (0,[])
+          ) ss
+      -- fix above: better explicit
+      pointsAt = let f u0 c = let rec x = case M.lookup (x,c) mp of Just v->v; Nothing-> if x==0 then 0 else rec (fl!x) in rec u0
+                     in fst (foldl' (\(u,acc) c -> let u1=f u c in (u1,acc++[tin M.! u1])) (0,[]))
+                  in []:[ f 0 <$> s | s<-ss ]
+      events = concatMap (\(i,(l,r,k)) ->
+                let u = endNodeList!!(k-1)
+                    t= tin M.! u
+                    to= tout M.! u
+                in [(r,(t, to, i, 1)), (l-1,(t, to, i, -1))]
+             ) qs
+      pts = pointsAt
+      versions = scanl (\st ys -> foldl' (\t y->update t 1 nodeCount y) st ys) Nil pts
+      contribs = [ (i, sign * querySeg (versions!!x) 1 nodeCount t to)
+                 | (x,(t,to,i,sign))<-events ]
+      ansArr = accumArray (+) 0 (1,q) contribs
+  forM_ [1..q] $ \i -> print (ansArr ! i)
 ",-1,,"
-haskell\11260\main.hs:13:37: error:
-    Variable not in scope: (.&.) :: Int -> Int -> Int
+haskell\1912\main.hs:27:8: error:
+    parse error (possibly incorrect indentation or mismatched brackets)
    |
-13 |   | otherwise = bitUpdate n (i + (i .&. (-i))) v (M.insertWith (+) i v bit)
+27 |        ) (fl,qs) childs in go qs fl'
 
-   |                                     ^^^
-
-haskell\11260\main.hs:17:63: error:
-    Variable not in scope: (.&.) :: Int -> Int -> Int
-   |
-17 | bitQuery i bit = M.findWithDefault 0 i bit + bitQuery (i - (i .&. (-i))) bit
-
-   |                                                               ^^^
-
-haskell\11260\main.hs:33:40: error:
-    * Couldn't match expected type `(a, [Int])' with actual type `AC'
-    * In the second argument of foldl', namely `ac1'
-      In the expression: foldl' (\ ac u -> (ac, queue)) ac1 queue
-      In an equation for `ac2':
-          ac2 = foldl' (\ ac u -> (ac, queue)) ac1 queue
-    * Relevant bindings include
-        ac2 :: (a, [Int]) (bound at haskell\11260\main.hs:33:5)
-   |
-33 |     ac2 = foldl' (\ac u -> (ac,queue)) ac1 queue
-
-   |                                        ^^^
+   |        ^
 ",1
-FAILED,"
-import Data.Array (Array, accumArray, (!), listArray)
-main :: IO ()
-main = do
-  input <- getContents
-  let (n:m:xs) = map read (words input) :: [Int]
-      edges = buildEdges m xs
-      adj :: Array Int [Int]
-      adj = accumArray (flip (:)) [] (1,n) (edges ++ map swap edges)
-      deg :: Array Int Int
-      deg = listArray (1,n) [length (adj ! i) | i <- [1..n]]
-      es = [(u,v) | (u,v) <- edges, u < v]
-      sums = [deg ! u + deg ! v + deg ! w - 6 | (u,v) <- es, w <- adj ! u, w > v, elem w (adj ! v)]
-  putStrLn $ if null sums then ""-1"" else show (minimum sums)
-
-buildEdges :: Int -> [Int] -> [(Int,Int)]
-buildEdges 0 _ = []
-buildEdges k (a:b:rest) = (a,b) : buildEdges (k-1) rest
-
-swap :: (a,b) -> (b,a)
-swap (x,y) = (y,x)
-",4,7,,0
 PASSED,"
-import Data.List (sort, nub)
-import Data.Array (Array, listArray, (!))
+import Data.Array (Array, listArray, accumArray, (!))
+import Data.List (sort)
 
-main :: IO ()
-main = do
-  inp <- getContents
-  let (nStr:kStr:rest) = words inp
-      n = read nStr :: Int
-      k = read kStr :: Int
-      nums = map read rest :: [Integer]
-      parse :: [Integer] -> [(Integer,Integer)]
-      parse (x1:y1:x2:y2:zs) = (x1+x2,y1+y2) : parse zs
-      parse [] = []
-      coords = parse nums
-      indexed = zip coords [0..]
-      xsList :: [(Integer,Int)]
-      xsList = sort [ (sx,i) | ((sx,_),i) <- indexed ]
-      ysList :: [(Integer,Int)]
-      ysList = sort [ (sy,i) | ((_,sy),i) <- indexed ]
-      revXsList = reverse xsList
-      revYsList = reverse ysList
-      xsArr :: Array Int (Integer,Int)
-      xsArr = listArray (0,n-1) xsList
-      ysArr :: Array Int (Integer,Int)
-      ysArr = listArray (0,n-1) ysList
-      combos = [ (i,j,p,q) | i <- [0..k], j <- [0..k-i], p <- [0..k-i-j], q <- [0..k-i-j-p] ]
-      initBest = 10 ^ (36 :: Int) :: Integer
-      f :: Integer -> (Int,Int,Int,Int) -> Integer
-      f cur (i,j,p,q) =
-        let removed = nub $
-              map snd (take i xsList) ++
-              map snd (take j revXsList) ++
-              map snd (take p ysList) ++
-              map snd (take q revYsList)
-        in if length removed > k then cur else
-          let elemRem = (`elem` removed)
-              minSX = let go d = let (v,idx) = xsArr ! d in if elemRem idx then go (d+1) else v in go 0
-              maxSX = let go d = let (v,idx) = xsArr ! d in if elemRem idx then go (d-1) else v in go (n-1)
-              minSY = let go d = let (v,idx) = ysArr ! d in if elemRem idx then go (d+1) else v in go 0
-              maxSY = let go d = let (v,idx) = ysArr ! d in if elemRem idx then go (d-1) else v in go (n-1)
-              dx = maxSX - minSX
-              dy = maxSY - minSY
-              w = let t = (dx+1) `div` 2 in if t > 0 then t else 1
-              h = let t = (dy+1) `div` 2 in if t > 0 then t else 1
-          in min cur (w * h)
-      ans = foldl f initBest combos
-  print ans
-",-1,,,0
-PASSED,"
-main :: IO ()
-main = interact solve
+pairs :: [Int] -> [(Int,Int)]
+pairs [] = []
+pairs (u:v:xs) = (if u<v then (u,v) else (v,u)) : pairs xs
 
-solve :: String -> String
-solve input =
-  let xs = map read (words input) :: [Int]
-      arr = tail xs
-      idx = [i | (i,a) <- zip [1..] arr, a == 1]
-      ans = if null idx then 0 else product [j - i | (i,j) <- zip idx (tail idx)]
-  in show ans
-",-1,,,0
-PASSED,"
+intersectSorted :: [Int] -> [Int] -> [Int]
+intersectSorted [] _ = []
+intersectSorted _ [] = []
+intersectSorted xs@(x:xt) ys@(y:yt)
+  | x == y    = x : intersectSorted xt yt
+  | x < y     = intersectSorted xt ys
+  | otherwise = intersectSorted xs yt
+
 main :: IO ()
 main = do
   contents <- getContents
-  let ls = lines contents
-      n = read (head ls) :: Int
-      codes = take n (tail ls)
-      dmin = if n <= 1 then 7 else minimum [ham a b | (i,a) <- zip [0..] codes, (j,b) <- zip [0..] codes, i < j]
-      k = if n <= 1 then 6 else (dmin - 1) `div` 2
-  print k
+  let ws = words contents
+      ush = map read ws :: [Int]
+      n = ush !! 0
+      m = ush !! 1
+      ps = drop 2 ush
+      edges = pairs ps
+      rawAdj = accumArray (flip (:)) [] (1,n) (concat [[(u,v),(v,u)] | (u,v) <- edges])
+      adj = listArray (1,n) [sort (rawAdj ! i) | i <- [1..n]]
+      deg = listArray (1,n) [length (adj ! i) | i <- [1..n]]
+      inf = maxBound :: Int
+      ans = foldl (\cur (u,v) ->
+                    let nu = adj ! u
+                        nv = adj ! v
+                        d_u = deg ! u
+                        d_v = deg ! v
+                        wsInt = intersectSorted nu nv
+                        vals = map (\w -> d_u + d_v + deg ! w - 6) wsInt
+                    in if null vals then cur else min cur (minimum vals)
+                  ) inf edges
+  if ans == inf then print (-1) else print ans
+",-1,,,0
+COMPILATION_ERROR,"
+import Data.List (sortBy, nub)
 
-ham :: String -> String -> Int
-ham xs ys = sum [1 | (x,y) <- zip xs ys, x /= y]
+main :: IO ()
+main = do
+    input <- getContents
+    let ws = words input
+        xs = map read ws :: [Integer]
+        nI = xs !! 0
+        kI = xs !! 1
+        n = fromIntegral nI :: Int
+        k = fromIntegral kI :: Int
+        rest = drop 2 xs
+        rects = chunk4 rest
+        pts = [ (i, x1 + x2, y1 + y2) | (i,(x1,y1,x2,y2)) <- zip [0..] rects ]
+        sortedX = sortBy (\(_,a,_) (_,b,_) -> compare a b) pts
+        sortedY = sortBy (\(_,_,a) (_,_,b) -> compare a b) pts
+        sx_ids = [i | (i,_,_) <- sortedX]
+        sx_xs  = [x | (_,x,_) <- sortedX]
+        sy_ids = [i | (i,_,_) <- sortedY]
+        sy_ys  = [y | (_,_,y) <- sortedY]
+        areas = [ let R0 = take i sx_ids ++ take j (reverse sx_ids) ++ take l sy_ids ++ take m (reverse sy_ids)
+                      R = nub R0
+                      xmn = findMin sx_ids sx_xs R
+                      xmx = findMax sx_ids sx_xs R
+                      ymn = findMin sy_ids sy_ys R
+                      ymx = findMax sy_ids sy_ys R
+                      dx2 = xmx - xmn
+                      dy2 = ymx - ymn
+                      w0 = (dx2 + 1) `div` 2
+                      h0 = (dy2 + 1) `div` 2
+                      w = if w0 < 1 then 1 else w0
+                      h = if h0 < 1 then 1 else h0
+                  in w * h
+                | i <- [0..k], j <- [0..k], l <- [0..k], m <- [0..k], i + j + l + m <= k ]
+    print (minimum areas)
+
+chunk4 :: [Integer] -> [(Integer, Integer, Integer, Integer)]
+chunk4 (a:b:c:d:es) = (a,b,c,d) : chunk4 es
+chunk4 _ = []
+
+findMin :: [Int] -> [Integer] -> [Int] -> Integer
+findMin (i:is) (v:vs) r = if notElem i r then v else findMin is vs r
+findMin _ _ _ = 0
+
+findMax :: [Int] -> [Integer] -> [Int] -> Integer
+findMax ids vals r = findMin (reverse ids) (reverse vals) r
+",-1,,"
+haskell\1912\main.hs:22:23: error:
+    Not in scope: data constructor `R0'
+   |
+22 |         areas = [ let R0 = take i sx_ids ++ take j (reverse sx_ids) ++ take l sy_ids ++ take m (reverse sy_ids)
+
+   |                       ^^
+
+haskell\1912\main.hs:23:23: error:
+    Not in scope: data constructor `R'
+   |
+23 |                       R = nub R0
+
+   |                       ^
+",1
+PASSED,"
+main :: IO ()
+main = do
+    input <- getContents
+    let ws = words input
+        n  = read (head ws) :: Int
+        a  = map read (take n (tail ws)) :: [Integer]
+        idx = [i | (i, v) <- zip [1..] a, v == 1]
+    print (if null idx then 0 else product [j - i | (i, j) <- zip idx (tail idx)])
+",-1,,,0
+PASSED,"
+import Control.Monad (replicateM)
+
+main :: IO ()
+main = do
+    n <- readLn :: IO Int
+    cs <- replicateM n getLine
+    let k = if n == 1 then 6 else let
+            indexed = zip [0..] cs
+            ds = [ sum [ if a /= b then 1 else 0 | (a,b) <- zip s t ]
+                 | (i,s) <- indexed, (j,t) <- indexed, i < j ]
+          in (minimum ds - 1) `div` 2
+    print k
 ",-1,,,0

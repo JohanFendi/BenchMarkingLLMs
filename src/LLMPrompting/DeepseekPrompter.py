@@ -15,5 +15,5 @@ class DeepseekPrompter(LLMPrompter):
 
 
     @override
-    def prompt(self, system_prompt:str, task_description:str, problem_description:str, public_tests:str) -> str:
-        return self._open_ai_prompter.prompt(system_prompt, task_description, problem_description, public_tests)
+    async def prompt(self, system_prompt:str, task_description:str, problem_description:str, public_tests:str) -> str:
+        return await self._open_ai_prompter.prompt(system_prompt, task_description, problem_description, public_tests)

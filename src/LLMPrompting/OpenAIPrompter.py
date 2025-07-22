@@ -1,6 +1,4 @@
-from openai import OpenAI
-
-
+from openai import AsyncOpenAI
 
 
 class OpenAIPrompter(): 
@@ -8,14 +6,14 @@ class OpenAIPrompter():
     
     def __init__(self, model:str, api_key:str, url:str) -> None: 
         self._model = model
-        self._client = OpenAI(
+        self._client = AsyncOpenAI(
             api_key=api_key, 
             base_url=url
         )
     
     
-    def prompt(self, system_prompt:str, task_description:str, problem_description:str, public_tests:str) -> str: 
-        response = self._client.chat.completions.create(
+    async def prompt(self, system_prompt:str, task_description:str, problem_description:str, public_tests:str) -> str: 
+        response = await self._client.chat.completions.create(
             model=self._model,
             messages=[
                 {"role": "user", "content": f"**Task description**:{task_description}"},
