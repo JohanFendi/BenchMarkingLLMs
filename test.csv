@@ -1,32 +1,410 @@
 status,problem_solution,failed_testcase_index,failed_output,stderr,return_code
+ERROR,"
+main :: IO ()
+main = interact $ \s -> show (fac (read s :: Integer))
+
+fac :: Integer -> Integer
+fac n = product [1..n]
+",0,,"main.exe: Prelude.read: no parse
+",1
+FAILED,"
+main :: IO ()
+main = do
+  [sa,sb,sp] <- words <$> getLine
+  let b = read sb :: Int
+      p = read sp :: Int
+      b' = fromIntegral b :: Double
+      p' = fromIntegral p :: Double
+      x = b' * (1 - sqrt (p' / 100))
+      r = floor (x * 100 + 0.5) :: Integer
+      i = r `div` 100
+      f = r `mod` 100
+      frac = if f < 10 then '0': show f else show f
+  putStrLn (show i ++ ""."" ++ frac)
+",77,-1.89,,0
+FAILED,"
+main :: IO ()
+main = do
+    s <- getLine
+    let n = read s :: Integer
+        k = computeK n
+        p = pow2 k
+        num = k * p
+        den = n
+        g = gcd num den
+        a = num `div` g
+        b = den `div` g
+    putStrLn (show a ++ ""/"" ++ show b)
+
+computeK :: Integer -> Integer
+computeK n = go 0 1 where
+    go :: Integer -> Integer -> Integer
+    go k p
+        | p >= n    = k
+        | otherwise = go (k + 1) (p * 2)
+
+pow2 :: Integer -> Integer
+pow2 0 = 1
+pow2 k = 2 * pow2 (k - 1)
+",0,6656/419,,0
+ERROR,"
+import Data.Array (Array,(!),(//),accumArray,listArray)
+
+main :: IO ()
+main = do
+  input <- getContents
+  let ws = words input
+      ns = map read (tail ws) :: [Int]
+      maxN = if null ns then 0 else maximum ns
+      big = maxN + 1
+      spfArr0 = accumArray min big (0,maxN) [ (i*j, i) | i <- [2..maxN], j <- [1..maxN `div` i] ]
+      spfArr = spfArr0 // [(0,0),(1,0)]
+      yArr = accumArray (+) 0 (0,maxN) [ (j, i) | i <- [1..maxN `div` 2], j <- [2*i,3*i..maxN] ]
+      xs = [ spfArr ! i | i <- [0..maxN] ]
+      fArr = listArray (0,maxN) (tail (scanl (+) 0 xs))
+      ys = [ yArr ! i | i <- [0..maxN] ]
+      gArr = listArray (0,maxN) (tail (scanl (+) 0 ys))
+      ans n = (fArr ! n + gArr ! n) `mod` n
+      res = [ ans n | n <- ns ]
+  putStr $ unlines (map show res)
+",1,,"main.exe: Prelude.read: no parse
+",1
+COMPILATION_ERROR,"
+import Data.Array (Array, array, accumArray, (!))
+
+main :: IO ()
+main = interact (unlines . solve . map read . words)
+
+solve :: [Int] -> [String]
+solve (t:xs) = fst (go t xs)
+
+go :: Int -> [Int] -> ([String],[Int])
+go 0 xs = ([], xs)
+go t xs = let (out1, xs1) = procCase xs
+              (outs, xs2) = go (t-1) xs1
+           in (out1 ++ outs, xs2)
+
+procCase :: [Int] -> ([String],[Int])
+procCase (n:rest) =
+    let parents = take n rest
+        rest1 = drop n rest
+        q = head rest1
+        pairsList = take (2*q) (tail rest1)
+        rest2 = drop (1 + 2*q) rest1
+        pList = 0 : parents
+        pArray :: Array Int Int
+        pArray = array (0,n) (zip [0..n] pList)
+        children :: Array Int [Int]
+        children = accumArray (flip (:)) [] (0,n) (zip parents [1..n])
+        root = case children ! 0 of [r] -> r; _ -> 0
+        depthList = dfs children root 0
+        depthArray :: Array Int Int
+        depthArray = array (0,n) ((0,0):depthList)
+        maxLog = 17
+        upArray :: Array (Int,Int) Int
+        upArray = array ((0,0),(n,maxLog))
+                  ([((i,0), pArray ! i) | i <- [0..n]] ++
+                   [((i,j), upArray ! (upArray ! (i,j-1), j-1)) | j <- [1..maxLog], i <- [0..n]])
+        pairXY = makePairs q pairsList
+        answer (x,y) =
+          let dx = depthArray ! x
+              dy = depthArray ! y
+           in if dx < dy then -1
+              else let d = dx - dy
+                       z = liftUp upArray x d
+                    in if z /= y then -1 else d - 1
+        outs = map (show . uncurry answer) pairXY
+     in (outs, rest2)
+
+makePairs :: Int -> [Int] -> [(Int,Int)]
+makePairs 0 _ = []
+makePairs q (x:y:rest) = (x,y) : makePairs (q-1) rest
+makePairs _ _ = []
+
+dfs :: Array Int [Int] -> Int -> Int -> [(Int,Int)]
+dfs children v d = (v,d) : concatMap (\c -> dfs children c (d+1)) (children ! v)
+
+liftUp :: Array (Int,Int) Int -> Int -> Int -> Int
+liftUp up x d = go x d 0 where
+  go v 0 _ = v
+  go v d j =
+    let (q,r) = quotRem d 2
+     in if r == 1 then go (up ! (v,j)) q (j+1) else go v q (j+1)
+",-1,,"
+haskell\2404\main.hs:45:36: error:
+    * Couldn't match type `Int' with `Int -> b0'
+      Expected: (Int, Int) -> Int -> b0
+        Actual: (Int, Int) -> Int
+    * In the first argument of `uncurry', namely `answer'
+      In the second argument of `(.)', namely `uncurry answer'
+      In the first argument of `map', namely `(show . uncurry answer)'
+   |
+45 |         outs = map (show . uncurry answer) pairXY
+
+   |                                    ^^^^^^
+
+haskell\2404\main.hs:45:44: error:
+    * Couldn't match type `Int' with `(Int, Int)'
+      Expected: [((Int, Int), Int)]
+        Actual: [(Int, Int)]
+    * In the second argument of `map', namely `pairXY'
+      In the expression: map (show . uncurry answer) pairXY
+      In an equation for `outs':
+          outs = map (show . uncurry answer) pairXY
+   |
+45 |         outs = map (show . uncurry answer) pairXY
+
+   |                                            ^^^^^^
+",1
+COMPILATION_ERROR,"
+main :: IO ()
+main = interact $ \input ->
+  let ints = map read (words input) :: [Int]
+      outs = solveAll ints
+  in concatMap (\x -> show x ++ ""\n"") outs
+
+solveAll :: [Int] -> [Integer]
+solveAll (t:xs) = go t xs where
+  go 0 _ = []
+  go k (n:e:v:rest) =
+    let (ys,rest') = splitAt n rest
+        ans = calc e v ys
+    in ans : go (k-1) rest'
+solveAll _ = []
+
+calc :: Int -> Int -> [Int] -> Integer
+calc e v = snd . foldl f (e,0)
+
+f :: (Int, Integer) -> Int -> (Int, Integer)
+f (m,ans) x
+  | m > x = (m-x,ans)
+  | otherwise =
+    let kInt = (x - m) `div` v + 1
+        k = toInteger kInt
+        m' = m + kInt * v - x
+    in (m',ans+k)
+",-1,,"
+haskell\2404\main.hs:24:30: error: Variable not in scope: v :: Int
+   |
+24 |     let kInt = (x - m) `div` v + 1
+
+   |                              ^
+
+haskell\2404\main.hs:26:25: error: Variable not in scope: v :: Int
+   |
+26 |         m' = m + kInt * v - x
+
+   |                         ^
+",1
 PASSED,"
+main :: IO ()
+main = do
+    _ <- getLine
+    s <- getLine
+    let (run, mi, ma) = foldl step (0, 0, 0) s
+        mn = mi + run `div` 2 + run `mod` 2
+        mx = ma + run
+    putStrLn (show mn ++ "" "" ++ show mx)
+
+step :: (Int, Int, Int) -> Char -> (Int, Int, Int)
+step (run, mi, ma) c
+    | c == 'v'  = (run + 1, mi, ma)
+    | c == 'w'  = (run + 2, mi, ma)
+    | otherwise = let mn = run `div` 2 + run `mod` 2
+                      mx = run
+                  in (0, mi + mn + 1, ma + mx + 1)
+",-1,,,0
+FAILED,"
+import Data.Array (Array, listArray, (!))
+import Data.List (foldl')
+import Data.Set (Set, fromList, size, toList)
+import Data.Char (isSpace)
+
+type Dir = Char
+
+main :: IO ()
+main = do
+    header <- getLine
+    let [n,m,k] = map read $ words header :: [Int]
+    gridLines <- sequence [getLine | _ <- [1..n]]
+    cmdsLine <- getLine
+    let flatGrid = concat gridLines
+        nm = n*m
+        passable = [i | (c,i) <- zip flatGrid [0..], c /= '#']
+        passableCount = length passable
+        exitIdx = head [i | (c,i) <- zip flatGrid [0..], c == 'E']
+        offsets = [('L', -1), ('R', 1), ('U', -m), ('D', m)]
+        inBounds i = i >= 0 && i < nm
+        isPass i = inBounds i && flatGrid !! i /= '#'
+        mkArr f = listArray (0,nm-1) [f i | i <- [0..nm-1]]
+        oppArr = [(c, mkArr (\q -> let p = q - d in if isPass p then p else -1)) | (c,d) <- offsets]
+        blockedArr = [(c, mkArr (\q -> let p = q + d in not (isPass p))) | (c,d) <- offsets]
+        oppMap c = case lookup c oppArr of Just a -> a; _ -> error ""no""
+        blockedMap c = case lookup c blockedArr of Just a -> a; _ -> error ""no""
+        step tprev c = fromList $ concatMap (\q ->
+            let bs = blockedMap c ! q
+                p = oppMap c ! q
+            in (if bs then [q] else []) ++ (if p >= 0 then [p] else [])
+            ) (toList tprev)
+        go _ _ i | i > k = putStrLn ""-1""
+        go tprev cmds i
+            | size tprev == passableCount = print (i-1)
+            | null cmds = putStrLn ""-1""
+            | otherwise =
+                let c = head cmds
+                    tcurr = step tprev c
+                in go tcurr (tail cmds) (i+1)
+    if passableCount == 1
+        then print 0
+        else go (fromList [exitIdx]) cmdsLine 1
+",1,-1,,0
+COMPILATION_ERROR,"
+import Data.Bits (shiftL,shiftR,(.&.),(.|.),complement,popCount)
+import Data.Word (Word64)
+import Data.List (foldl')
+main :: IO ()
+main = do
+    input <- getContents
+    let (header:rest) = lines input
+        [n,m,k] = map read $ words header :: [Int]
+        grid = take n rest
+        cmds = rest !! n
+        chunkCount = (m + 63) `div` 64
+        rowBits row = [ foldl' (\acc b ->
+            let c = row !! (j*64 + b)
+            in if c == '.' || c == 'E' then acc .|. (1 `shiftL` b) else acc
+            ) 0 [0..63] | j <- [0..chunkCount-1]]
+            where row = grid !! i
+              where i = 0
+        rowBitsAt i = [ foldl' (\acc b ->
+            let idx = j*64 + b
+            in if idx < m then let c = grid !! i !! idx
+                               in if c == '.' || c == 'E' then acc .|. (1 `shiftL` b) else acc
+                          else acc
+            ) 0 [0..63] | j <- [0..chunkCount-1]]
+        p = [ rowBitsAt i | i <- [0..n-1] ]
+        totalP = sum [ popCount w | row <- p, w <- row ]
+        exitR = [ rowBitsAt i | i <- [0..n-1] ]
+        exitPos = head [ (i,j) | i <- [0..n-1], j <- [0..m-1], grid !! i !! j == 'E' ]
+        initR = [ [ if i==ei && j==ec then 1 `shiftL` (ec - j*64) else 0
+                  | j <- [0..chunkCount-1]] | i <- [0..n-1] ]
+            where (ei,ec) = exitPos
+    if totalP == 1 then print 0 else go 1 initR cmds p totalP
+  where
+    go i r (c:cs) p totalP =
+        let shiftLeftRow row = fst $ foldl' (\(acc,carry) w ->
+                let newCarry = w `shiftR` 63
+                    newW = (w `shiftL` 1) .|. carry
+                in (acc ++ [newW], newCarry)
+            ) ([],0) row
+            shiftRightRow row = fst $ foldl' (\(acc,carry) w ->
+                let newCarry = w .&. 1
+                    newW = (w `shiftR` 1) .|. (carry `shiftL` 63)
+                in (acc ++ [newW], newCarry)
+            ) ([],0) row
+            zeroRow = replicate (length (head r)) 0
+            (r',cnt) = case c of
+                'L' -> let rl = map shiftLeftRow r
+                           pl = map shiftLeftRow p
+                           r2 = [ zipWith3 (\a t1 t2 -> (t1 .|. (a .&. complement t2)) .&. pp) ar t1 t2
+                                 | ((ar,pp),(t1,t2)) <- zip (zip r p) (zip rl pl) ]
+                       in (r2, sum [ popCount w | row <- r2, w <- row ])
+                'R' -> let rr = map shiftRightRow r
+                           pr = map shiftRightRow p
+                           r2 = [ zipWith3 (\a t1 t2 -> (t1 .|. (a .&. complement t2)) .&. pp) ar t1 t2
+                                 | ((ar,pp),(t1,t2)) <- zip (zip r p) (zip rr pr) ]
+                       in (r2, sum [ popCount w | row <- r2, w <- row ])
+                'U' -> let t1 = zeroRow : init r
+                           t2 = zeroRow : init p
+                           r2 = [ zipWith3 (\a t1i t2i -> (t1i .|. (a .&. complement t2i)) .&. pp) aRow t1Row t2Row
+                                 | ((aRow,pp),(t1Row,t2Row)) <- zip (zip r p) (zip t1 t2) ]
+                       in (r2, sum [ popCount w | row <- r2, w <- row ])
+                'D' -> let t1 = tail r ++ [zeroRow]
+                           t2 = tail p ++ [zeroRow]
+                           r2 = [ zipWith3 (\a t1i t2i -> (t1i .|. (a .&. complement t2i)) .&. pp) aRow t1Row t2Row
+                                 | ((aRow,pp),(t1Row,t2Row)) <- zip (zip r p) (zip t1 t2) ]
+                       in (r2, sum [ popCount w | row <- r2, w <- row ])
+                _ -> (r,0)
+        in if cnt == totalP then print i else if null cs then print (-1) else go (i+1) r' cs p totalP
+    go _ _ [] _ _ = print (-1)
+",-1,,"
+haskell\2884\main.hs:19:9: error: parse error on input `rowBitsAt'
+   |
+19 |         rowBitsAt i = [ foldl' (\acc b ->
+
+   |         ^^^^^^^^^
+",1
+FAILED,"
+main :: IO ()
+main = interact go
+
+go :: String -> String
+go input = let ws = words input
+               (t:rest) = ws
+               ss = take (read t :: Int) rest
+           in unlines $ map (\s -> if isBalanced s then ""YES"" else ""NO"") ss
+
+isBalanced :: String -> Bool
+isBalanced s = check 0 s
+
+check :: Int -> String -> Bool
+check n [] = n == 0
+check n (c:cs)
+  | c == '('  = check (n+1) cs
+  | c == ')'  = if n > 0 then check (n-1) cs else False
+  | otherwise = check n cs
+",9,"NO
+NO
+YES",,0
+FAILED,"
 main :: IO ()
 main = interact solve
 
 solve :: String -> String
-solve s =
-  let ws = words s
-      n = read (head ws) :: Int
-      cs = take n (tail ws)
-      dmin = if n < 2 then 7 else minimum [ hamming a b | (i,a) <- zip [0..] cs, b <- drop (i+1) cs ]
-      k = if n < 2 then 6 else (dmin - 1) `div` 2
-  in show k
+solve input =
+  let ws = words input
+      ss = tail ws
+      res = map (\s -> if isBalanced s then ""YES"" else ""NO"") ss
+  in joinLines res
 
-hamming :: String -> String -> Int
-hamming a b = length (filter id (zipWith (/=) a b))
-",-1,,,0
-PASSED,"
-import Control.Monad (replicateM)
+joinLines :: [String] -> String
+joinLines [] = """"
+joinLines [x] = x
+joinLines (x:xs) = x ++ ""\n"" ++ joinLines xs
 
+isBalanced :: String -> Bool
+isBalanced = go 0
+  where
+    go :: Int -> String -> Bool
+    go n [] = n == 0
+    go n (c:cs)
+      | n < 0 = False
+      | c == '(' = go (n+1) cs
+      | c == ')' = go (n-1) cs
+      | otherwise = go n cs
+",9,"NO
+NO
+YES",,0
+FAILED,"
 main :: IO ()
 main = do
-  n <- readLn :: IO Int
-  codes <- replicateM n getLine
-  let k = if n == 1 then 6 else
-            let minD = minimum [hamming a b | (i,a) <- zip [0..] codes, (j,b) <- zip [0..] codes, i < j]
-            in (minD - 1) `div` 2
-  putStrLn (show k)
+  content <- getContents
+  let ls = lines content
+      t = read (head ls) :: Int
+      ss = take t (tail ls)
+      res = map (\s -> if isBalanced s then ""YES"" else ""NO"") ss
+  mapM_ putStrLn res
 
-hamming :: String -> String -> Int
-hamming a b = sum [1 | (x,y) <- zip a b, x /= y]
-",-1,,,0
+isBalanced :: String -> Bool
+isBalanced s = helper s 0
+
+helper :: String -> Int -> Bool
+helper [] cnt = cnt == 0
+helper (x:xs) cnt
+  | cnt < 0 = False
+  | x == '(' = helper xs (cnt + 1)
+  | x == ')' = helper xs (cnt - 1)
+  | otherwise = helper xs cnt
+",9,"NO
+NO
+YES",,0

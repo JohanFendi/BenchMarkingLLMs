@@ -31,9 +31,9 @@ column_names = AVAILABLE_COLUMNS
 llm_task_description = HASKELL_TASK_DESCRIPTION
 llm_system_prompt = SYSTEM_PROMPT
 max_buffer_size = 25
-max_parallell_ai_prompts = 5
-start_index = 7029
-end_index = 7030 #Exclusive
+max_parallell_ai_prompts = 8
+start_index = 0
+end_index = 1 #Exclusive
 epoch_size = max_buffer_size
 
 

@@ -1,4 +1,5 @@
 from logging import Logger
+from time import time
 
 
 from src.Exceptions import *
@@ -44,10 +45,12 @@ class App:
         current_index = start_index
         try: 
             print("In loop")
+
+            epoch_start_time = time()
             while current_index < end_index:   
                 coro = self._pipeline.prompt_llm(current_index, self._llm_system_prompt, self._llm_task_description) 
                 if self._llm_schedular.is_full(): 
-                    await self._process_point(process_id)
+                    epoch_start_time = await self._process_point(process_id, epoch_start_time)
                 else: 
                     print(f"Scheduled LLM prompt with index {current_index}")
                     scheduled = await self._llm_schedular.schedule(coro)
@@ -56,11 +59,10 @@ class App:
                     current_index += 1
 
             while not self._llm_schedular.is_empty():
-               await self._process_point(process_id)
-
+               epoch_start_time = await self._process_point(process_id, epoch_start_time)
+               
             print("Out of loop!")
-
-            self._epoch_logger.log_epoch()    
+            self._epoch_logger.log_epoch(epoch_start_time)    
             self._pipeline.clean_up()
               
 
@@ -98,17 +100,32 @@ class App:
         
 
     async def _process_point(self,
-                             process_id:str) -> None: 
+                             process_id:str, 
+                             epoch_start_time:float) -> float: 
         
+        print(f"Waiting for schedular response at:{round(time(), 2)}")
+        response_start_time = time()
         llm_prompt_datapoints = await self._llm_schedular.get()
-        print(type(llm_prompt_datapoints))
+        response_end_time = time()
+
+        response_time = response_end_time - response_start_time
         if len(llm_prompt_datapoints) == 0: 
             raise SchedulerError(f"Process point was called while Task Scheduler was empty.")
 
         for llm_prompt_data in llm_prompt_datapoints: 
-            eval_time, db_write_time, status = self._pipeline.run_evaluation(llm_prompt_data, process_id)
-            self._epoch_logger.update_epoch(llm_prompt_data.ai_time, eval_time, db_write_time, status)
+            eval_time, _, status = self._pipeline.run_evaluation(llm_prompt_data, process_id)
 
+            time_data = { 
+                "AI_API_RESPONSE_TIME":llm_prompt_data.ai_time, 
+                "AI_API_WAITING_TIME":response_time,
+                "EVALUATION_TIME":eval_time
+            }
+
+            for k,v in time_data.items(): 
+                print(f"{k}: {round(v,4)}")
+
+            epoch_start_time = self._epoch_logger.update_epoch(time_data, epoch_start_time, status)
+        return epoch_start_time
 
 
 

@@ -107,12 +107,14 @@ class Pipeline():
         else: 
             status = constants.COMPILATION_ERROR_STRING
 
-        eval_end_time = time()    
-        eval_time = eval_end_time - eval_start_time
+        
 
         #Store result
         iteration_data = IterationData(problem_solution, status, failed_output, stderr, failed_testcase_index, return_code)
         db_write_time = self._store_result(iteration_data)
+
+        eval_end_time = time()    
+        eval_time = eval_end_time - eval_start_time
 
         print(f"Finished eval pipeline for index {llm_prompt_data.index}")
         return eval_time, db_write_time, status
