@@ -50,7 +50,9 @@ class App:
                     await self._process_point(process_id)
                 else: 
                     print(f"Scheduled LLM prompt with index {current_index}")
-                    await self._llm_schedular.schedule(coro, current_index)
+                    scheduled = await self._llm_schedular.schedule(coro)
+                    if not scheduled: 
+                        raise SchedulerError(f"Task scheduler was not full, but task failed to schedule.")
                     current_index += 1
 
             while not self._llm_schedular.is_empty():
@@ -90,16 +92,22 @@ class App:
             self._error_logger.exception(f"Iteration {current_index} of App.run(): ColumnMismatchError:")
             return
         
+        except SchedulerError as e: 
+            self._error_logger.exception(f"Iteration {current_index} of App.run(): SchedulerError:")
+            return
+        
 
     async def _process_point(self,
                              process_id:str) -> None: 
         
-        
-        llm_prompt_task, index = await self._llm_schedular.get()
-        print(f"Awaiting task with index {index}")
-        llm_prompt_data = await llm_prompt_task
-        pipeline_time, db_write_time, status = self._pipeline.run_evaluation(llm_prompt_data, process_id)
-        self._epoch_logger.update_epoch(llm_prompt_data.ai_time, pipeline_time, db_write_time, status)
+        llm_prompt_datapoints = await self._llm_schedular.get()
+        print(type(llm_prompt_datapoints))
+        if len(llm_prompt_datapoints) == 0: 
+            raise SchedulerError(f"Process point was called while Task Scheduler was empty.")
+
+        for llm_prompt_data in llm_prompt_datapoints: 
+            eval_time, db_write_time, status = self._pipeline.run_evaluation(llm_prompt_data, process_id)
+            self._epoch_logger.update_epoch(llm_prompt_data.ai_time, eval_time, db_write_time, status)
 
 
 

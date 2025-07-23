@@ -19,6 +19,7 @@ from src.Logging.EpochLogger import EpochLogger
 from src.Logging.GetLogger import get_logger
 from src.Pipeline import Pipeline
 from src.Scheduling.QueueScheduler import QueueScheduler
+from src.Scheduling.UnorderedScheduler import UnorderedScheduler
 
 
 
@@ -31,8 +32,8 @@ llm_task_description = HASKELL_TASK_DESCRIPTION
 llm_system_prompt = SYSTEM_PROMPT
 max_buffer_size = 25
 max_parallell_ai_prompts = 5
-start_index = 7025
-end_index = 7030
+start_index = 7029
+end_index = 7030 #Exclusive
 epoch_size = max_buffer_size
 
 
@@ -47,7 +48,7 @@ db_writer = CSVWriter(csv_file_name, column_names, max_buffer_size)
 solution_tester = Tester()
 epoch_logger = EpochLogger(epoch_size)
 error_logger = get_logger(LOGGER_FORMAT, ERROR_LOGGER_NAME, ERROR_LOG_FILE_NAME)
-llm_scheduler = QueueScheduler(max_parallell_ai_prompts)
+llm_scheduler = UnorderedScheduler(max_parallell_ai_prompts)
 
 
 

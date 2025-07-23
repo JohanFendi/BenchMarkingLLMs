@@ -9,19 +9,19 @@ class EpochLogger():
     def __init__(self, epoch_size:int) -> None:
         self._logger = get_logger(LOGGER_FORMAT, EPOCH_LOGGER_NAME, EPOCH_LOG_FILE_NAME)
         self._epoch_size = epoch_size
-        self._epoch_ai_time = self._epoch_pipeline_time = self._epoch_id = self._epoch_num_itr = 0
+        self._epoch_ai_time = self._epoch_eval_time = self._epoch_id = self._epoch_num_itr = 0
         self._epoch_status_occurences = {}
     
     
     def update_epoch(self, 
                     ai_time:int, 
-                    pipeline_time:int, 
+                    eval_time:int, 
                     db_write_time:int,
-                    status:str) -> None: 
+                    status:str) -> bool: #If epoch was logged
         
-        pipeline_time += db_write_time   
+        eval_time += db_write_time   
         self._epoch_ai_time += ai_time
-        self._epoch_pipeline_time += pipeline_time
+        self._epoch_eval_time += eval_time
         self._epoch_num_itr += 1
 
         if status in self._epoch_status_occurences: 
@@ -32,8 +32,11 @@ class EpochLogger():
         if self._epoch_num_itr == self._epoch_size: 
             self.log_epoch()
             self._epoch_id += 1
-            self._epoch_ai_time = self._epoch_pipeline_time = self._epoch_num_itr = 0
+            self._epoch_ai_time = self._epoch_eval_time = self._epoch_num_itr = 0
             self._epoch_status_occurences = {}
+            return True #Epoch was logged
+        
+        return False #Epoch was not logged
 
     
     def log_epoch(self) -> None:
@@ -41,17 +44,16 @@ class EpochLogger():
             self._logger.warning(f"Attempted to log epoch {self._epoch_id}, but no iterations were done in epoch.")
             return 
         
-        avg_pipeline_time = self._epoch_pipeline_time / self._epoch_num_itr
+        avg_pipeline_time = self._epoch_eval_time / self._epoch_num_itr
         avg_ai_time = self._epoch_ai_time / self._epoch_num_itr
         self._logger.info(f"\nEpoch {self._epoch_id}:")
         self._logger.info(f"Average AI prompting time for epoch {self._epoch_id}: {round(avg_ai_time, 2)}")
-        self._logger.info(f"Average pipeline time for epoch {self._epoch_id}: {round(avg_pipeline_time, 2)}")
+        self._logger.info(f"Average evaluation time for epoch {self._epoch_id}: {round(avg_pipeline_time, 2)}")
         self._logger.info(f"Percentages for statuses: " + EpochLogger._get_percentages_str(self._epoch_status_occurences, self._epoch_num_itr))
-
     
-    T = TypeVar("T")
+  
     @staticmethod
-    def _get_percentages_str(occurences_dict:dict[T, int], 
+    def _get_percentages_str(occurences_dict:dict[any, int], 
                              total_num_occur:int) -> str: 
         
         keys = occurences_dict.keys()

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Coroutine
+from typing import Coroutine, Any
 from asyncio import Task
 
 
@@ -8,14 +8,14 @@ class Scheduler(ABC):
 
 
     @abstractmethod
-    async def schedule(self, coro:Coroutine[any, any, any], id: int) -> bool:
-        """Schedules LLM prompting task. Retuns true if succesful else false"""
+    async def schedule(self, coro:Coroutine[Any, Any, Any]) -> bool:
+        """Makes corutine into task and schedules it. Retuns true if succesful else false"""
         pass
 
 
     @abstractmethod
-    async def get(self) -> tuple[Task[any], int]: 
-        """Get LLM prompting task with heighest priority. """
+    async def get(self) -> list[Any]: 
+        """Get results of some tasks in a set. """
         pass
 
 

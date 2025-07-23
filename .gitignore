@@ -1,6 +1,7 @@
-haskell
+haskell/
 .env
 test.csv
 Epoch.log
 Error.log
 test.py
+__pycache__/

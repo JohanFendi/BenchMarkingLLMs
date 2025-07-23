@@ -34,3 +34,9 @@ class APIKeyNotFoundError(Exception):
 #Thrown by remove_code_fence
 class CodeFenceNotFoundError(Exception): 
     pass
+
+
+class SchedulerError(Exception): 
+    pass
+
+

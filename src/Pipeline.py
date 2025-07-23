@@ -57,15 +57,14 @@ class Pipeline():
 
 
     async def prompt_llm(self, 
-                    index:int, 
-                    llm_system_prompt:str, 
-                    llm_task_description:str) -> LLMPromptData: 
+                        index:int, 
+                        llm_system_prompt:str, 
+                        llm_task_description:str) -> LLMPromptData: 
         
         if not (0 <= index < self._max_index): 
             raise IndexError(f"end_index has to be between 0 and {self._max_index}, not {index}.")
         
         #Get inputs for model
-        pipeline_start_time = time()
         formated_public_tests = self._prompt_preprocessor.getFormatedPublicTests(index)
         problem_description = self._prompt_preprocessor.getProblemDescription(index)
 
@@ -77,15 +76,16 @@ class Pipeline():
         print(f"Finished Prompting AI with datapoint with index {index}")
 
         ai_time = ai_end_time - ai_start_time
-        return LLMPromptData(ai_time, pipeline_start_time, problem_solution, index)
+        return LLMPromptData(ai_time, problem_solution, index)
         
   
     def run_evaluation(self, 
                        llm_prompt_data:LLMPromptData, 
-                       process_id:str) -> tuple[float, float, str]:  
+                       process_id:str) -> tuple[float, float, str]:  #Eval time, Db write time, status
         
         print(f"Starting eval pipeline for index {llm_prompt_data.index}")
-        
+        eval_start_time = time()
+
         problem_solution = remove_code_fence(self._programming_language, llm_prompt_data.problem_solution)
         self._solution_writer.write_solution(self._file_name, self._programming_language, process_id, 
                                              problem_solution, self._file_postfix)
@@ -107,15 +107,15 @@ class Pipeline():
         else: 
             status = constants.COMPILATION_ERROR_STRING
 
-        pipeline_end_time = time()    
-        pipeline_time = pipeline_end_time - llm_prompt_data.pipeline_start_time - llm_prompt_data.ai_time
+        eval_end_time = time()    
+        eval_time = eval_end_time - eval_start_time
 
         #Store result
         iteration_data = IterationData(problem_solution, status, failed_output, stderr, failed_testcase_index, return_code)
         db_write_time = self._store_result(iteration_data)
 
         print(f"Finished eval pipeline for index {llm_prompt_data.index}")
-        return pipeline_time, db_write_time, status
+        return eval_time, db_write_time, status
     
 
     def _store_result(self, 

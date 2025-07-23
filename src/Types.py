@@ -14,6 +14,5 @@ class IterationData:
 @dataclass
 class LLMPromptData: 
     ai_time:float
-    pipeline_start_time:float
     problem_solution:str
     index:int
